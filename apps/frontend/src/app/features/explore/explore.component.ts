@@ -6,6 +6,7 @@ import {
 import { MapService, ViewportBounds } from '../../core/services/map.service';
 import { CountyService, CountySummary, countySlug } from '../../core/services/county.service';
 import { Poi, POIService } from '../../core/services/poi.service';
+import { Event as AppEvent, EventService } from '../../core/services/event.service';
 import { CATEGORIES } from '../landing/landing-content';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, ParamMap, Router, RouterLink } from '@angular/router';
@@ -14,9 +15,32 @@ import { ICONS } from '../../shared/icons/icons';
 import { CategoryIconComponent } from '../../shared/icons/category-icon.component';
 
 const HUNGARY_BOUNDS = { minLat: 45.5, maxLat: 48.7, minLng: 16, maxLng: 23 };
+const MAX_VISIBLE_CARDS = 20;
+const EVENT_PANEL_ZOOM_THRESHOLD = 10;
 
 const plain = (s: string) =>
   s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+
+type EventDatePreset = 'any' | 'today' | 'tomorrow' | 'nextDays' | 'fixed';
+
+type ExploreCard = {
+  kind: 'poi' | 'event';
+  id: string;
+  title: string;
+  category: string;
+  description?: string;
+  sponsored?: boolean;
+  source?: string;
+  website?: string;
+  sourceUrl?: string;
+  address?: string;
+  phone?: string;
+  location?: { type: string; coordinates: [number, number] };
+  startTime?: Date;
+  endTime?: Date;
+  venue?: string;
+  settlement?: string;
+};
 
 @Component({
   selector: 'app-explore',
@@ -36,20 +60,25 @@ export class ExploreComponent implements OnInit, AfterViewInit, OnDestroy {
 
   mapZoom = 7;
   visiblePOIs: Poi[] = [];
+  visibleCards: ExploreCard[] = [];
   selectedCategories: Set<string> = new Set();
   poiState: 'loading' | 'ready' | 'error' = 'loading';
-  /** POIs matching the active category filter anywhere in Hungary; null = not checked/unknown. */
   elsewhereCount: number | null = null;
   mapError = '';
   counties: CountySummary[] = [];
   selectedCounty?: CountySummary;
-  selectedPoi?: Poi;
+  selectedCard?: ExploreCard;
   countyError = '';
   countyAttribution = '';
   notices: string[] = [];
-  /** Mobile only: which pane is visible. */
   mobileView: 'map' | 'list' = 'map';
   failedImages = new Set<string>();
+
+  eventDatePreset: EventDatePreset = 'nextDays';
+  eventDaysWindow = 7;
+  eventFixedDate = '';
+  countyFilterEngaged = false;
+  private randomSeed = Date.now();
 
   private categoryNotice = '';
   private countyNotice = '';
@@ -58,23 +87,27 @@ export class ExploreComponent implements OnInit, AfterViewInit, OnDestroy {
   private reload$ = new Subject<void>();
   private destroy$ = new Subject<void>();
   private counties$ = new BehaviorSubject<CountySummary[] | null>(null);
-  /** Whole-country existence check per category combination: asked once, not on every pan. */
   private elsewhereCache = new Map<string, number | null>();
 
   constructor(
     private mapService: MapService,
     private poiService: POIService,
+    private eventService: EventService,
     private countyService: CountyService,
     private route: ActivatedRoute,
     private router: Router,
   ) {}
 
-  get selectedCategoryList(): string[] {
-    return this.categoryOptions.map((c) => c.key).filter((k) => this.selectedCategories.has(k));
+  get hasActiveFilters(): boolean {
+    return !!this.selectedCounty || this.selectedCategories.size > 0 || this.eventDatePreset !== 'nextDays' || this.eventDaysWindow !== 7;
   }
 
-  get hasActiveFilters(): boolean {
-    return !!this.selectedCounty || this.selectedCategories.size > 0;
+  get showEventDateFilters(): boolean {
+    return this.selectedCategories.has('event') || this.mapZoom >= EVENT_PANEL_ZOOM_THRESHOLD;
+  }
+
+  get shouldRandomizeCards(): boolean {
+    return this.countyFilterEngaged;
   }
 
   categoryLabel(key: string): string {
@@ -85,14 +118,24 @@ export class ExploreComponent implements OnInit, AfterViewInit, OnDestroy {
     return this.selectedCategories.has(key);
   }
 
-  /** Only http(s) links are rendered, whatever the data contains. */
-  safeUrl(url: string | null): string | null {
+  safeUrl(url: string | null | undefined): string | null {
     return url && /^https?:\/\//i.test(url) ? url : null;
   }
 
-  osmLink(poi: Poi): string | null {
-    const c = poi.location?.coordinates;
+  osmLink(card: ExploreCard): string | null {
+    const c = card.location?.coordinates;
     return c ? `https://www.openstreetmap.org/?mlat=${c[1]}&mlon=${c[0]}#map=17/${c[1]}/${c[0]}` : null;
+  }
+
+  formatEventDate(date?: Date): string {
+    if (!date) return '';
+    return new Intl.DateTimeFormat('hu-HU', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(date);
   }
 
   ngOnInit() {
@@ -108,7 +151,6 @@ export class ExploreComponent implements OnInit, AfterViewInit, OnDestroy {
     this.countyService.getAllCounties().pipe(takeUntil(this.destroy$)).subscribe({
       next: (counties) => {
         this.counties = counties;
-        // Credit required by the boundary licence (CC BY 4.0); same text for every row of one source.
         this.countyAttribution = counties.find((c) => c.attribution)?.attribution ?? '';
         this.mapService.setCounties(counties);
         this.counties$.next(counties);
@@ -120,7 +162,6 @@ export class ExploreComponent implements OnInit, AfterViewInit, OnDestroy {
       },
     });
 
-    // The URL is the single source of truth: clicks and chips only navigate, this applies the result.
     this.route.queryParamMap.pipe(takeUntil(this.destroy$)).subscribe((p) => this.applyCategoryParam(p));
 
     combineLatest([
@@ -140,10 +181,10 @@ export class ExploreComponent implements OnInit, AfterViewInit, OnDestroy {
 
     this.mapService.poiClick$.pipe(takeUntil(this.destroy$)).subscribe((id) => {
       const poi = this.visiblePOIs.find((p) => p.id === id);
-      if (poi) this.selectPoi(poi, false);
+      if (!poi) return;
+      this.selectCard(this.poiToCard(poi), false);
     });
 
-    // Viewport -> POIs. Debounced, and switchMap cancels any request that is already stale.
     this.reload$
       .pipe(
         debounceTime(250),
@@ -152,22 +193,49 @@ export class ExploreComponent implements OnInit, AfterViewInit, OnDestroy {
           const v = this.viewport;
           if (!v) return EMPTY;
           const categories = Array.from(this.selectedCategories);
-          return this.poiService.getPOIsByViewport(v.minLat, v.maxLat, v.minLng, v.maxLng, categories).pipe(
-            switchMap((pois) => {
-              if (pois.length || !categories.length) return of({ pois, elsewhere: null as number | null });
-              // Empty with a filter on: is that only because of the viewport? Asked once per filter set.
-              const key = [...categories].sort().join(',');
-              if (this.elsewhereCache.has(key)) return of({ pois, elsewhere: this.elsewhereCache.get(key)! });
+          const poiCategories = categories.filter((c) => c !== 'event');
+          const fetchEvents = categories.length === 0 || categories.includes('event');
+
+          const poiRequest = this.poiService.getPOIsByViewport(
+            v.minLat,
+            v.maxLat,
+            v.minLng,
+            v.maxLng,
+            poiCategories.length > 0 ? poiCategories : undefined,
+          );
+          const eventRequest = fetchEvents
+            ? this.eventService.getEventsByViewport(v.minLat, v.minLng, v.maxLat, v.maxLng, {
+                countyId: this.selectedCounty?.id,
+                days: this.getEventDaysApiParam(),
+              }).pipe(catchError(() => of([] as AppEvent[])))
+            : of([] as AppEvent[]);
+
+          return combineLatest([poiRequest, eventRequest]).pipe(
+            switchMap(([pois, events]) => {
+              const filteredEvents = this.filterEventsByDate(events);
+              const cards = this.limitCards([
+                ...pois.map((poi) => this.poiToCard(poi)),
+                ...filteredEvents.map((event) => this.eventToCard(event)),
+              ]);
+
+              if (pois.length || !poiCategories.length) {
+                return of({ pois, cards, elsewhere: null as number | null });
+              }
+
+              const key = [...poiCategories].sort().join(',');
+              if (this.elsewhereCache.has(key)) {
+                return of({ pois, cards, elsewhere: this.elsewhereCache.get(key)! });
+              }
               const b = HUNGARY_BOUNDS;
-              return this.poiService.getPOIsByViewport(b.minLat, b.maxLat, b.minLng, b.maxLng, categories).pipe(
+              return this.poiService.getPOIsByViewport(b.minLat, b.maxLat, b.minLng, b.maxLng, poiCategories).pipe(
                 map((all) => all.length as number | null),
                 catchError(() => of(null as number | null)),
                 tap((n) => this.elsewhereCache.set(key, n)),
-                map((elsewhere) => ({ pois, elsewhere })),
+                map((elsewhere) => ({ pois, cards, elsewhere })),
               );
             }),
             catchError((err) => {
-              console.error('POI request failed', err);
+              console.error('POI/Event request failed', err);
               this.poiState = 'error';
               return EMPTY;
             }),
@@ -175,12 +243,15 @@ export class ExploreComponent implements OnInit, AfterViewInit, OnDestroy {
         }),
         takeUntil(this.destroy$),
       )
-      .subscribe(({ pois, elsewhere }) => {
+      .subscribe(({ pois, cards, elsewhere }) => {
         this.visiblePOIs = pois;
+        this.visibleCards = cards;
         this.elsewhereCount = elsewhere;
         this.poiState = 'ready';
         this.mapService.setPOIs(pois);
-        if (this.selectedPoi) this.selectedPoi = pois.find((p) => p.id === this.selectedPoi!.id) ?? this.selectedPoi;
+        if (this.selectedCard) {
+          this.selectedCard = cards.find((c) => c.kind === this.selectedCard!.kind && c.id === this.selectedCard!.id) ?? this.selectedCard;
+        }
       });
   }
 
@@ -196,10 +267,8 @@ export class ExploreComponent implements OnInit, AfterViewInit, OnDestroy {
 
   @HostListener('document:keydown.escape')
   onEscape() {
-    if (this.selectedPoi) this.closePoi();
+    if (this.selectedCard) this.closeDetail();
   }
-
-  // ---- URL state -------------------------------------------------------------------------
 
   private applyCategoryParam(params: ParamMap) {
     const requested = (params.get('category') ?? '').split(',').map((v) => v.trim()).filter(Boolean);
@@ -235,11 +304,11 @@ export class ExploreComponent implements OnInit, AfterViewInit, OnDestroy {
       return EMPTY;
     }
     this.updateNotices();
-    // Accurate full-resolution geometry for the detailed view, not the simplified overview one.
     return this.countyService.getCountyGeometry(county.id).pipe(
       tap((g) => {
         this.selectedCounty = county;
         this.mapService.showCountyDetail(county.id, g.geometry);
+        this.reload$.next();
       }),
       catchError((err) => {
         console.error('County geometry request failed', err);
@@ -253,12 +322,9 @@ export class ExploreComponent implements OnInit, AfterViewInit, OnDestroy {
     this.notices = [this.categoryNotice, this.countyNotice, this.searchNotice].filter(Boolean);
   }
 
-  /** Changes only the given params (null removes one) and keeps every other query parameter. */
   private updateQuery(params: Record<string, string | null>) {
     this.router.navigate([], { relativeTo: this.route, queryParams: params, queryParamsHandling: 'merge' });
   }
-
-  // ---- user actions ----------------------------------------------------------------------
 
   toggleCategory(category: string, on: boolean) {
     const next = new Set(this.selectedCategories);
@@ -273,28 +339,32 @@ export class ExploreComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   resetFilters() {
-    this.closePoi();
+    this.closeDetail();
     this.searchNotice = '';
+    this.countyFilterEngaged = false;
+    this.eventDatePreset = 'nextDays';
+    this.eventDaysWindow = 7;
+    this.eventFixedDate = '';
     this.updateQuery({ county: null, category: null });
     this.mapService.resetView();
+    this.reload$.next();
   }
 
-  /** Back to the country-wide view without touching the filters. */
   showWholeCountry() {
     this.mapService.resetView();
   }
 
-  /** County search box: jumps to the matching county via the URL. */
   searchCounty(value: string, input: HTMLInputElement) {
+    this.activateCountyRandom();
     const q = plain(value);
     this.searchNotice = '';
-    if (!q) {
-      this.updateNotices();
-      return;
-    }
-    const hit =
-      this.counties.find((c) => plain(c.name) === q || countySlug(c) === q) ??
-      this.counties.find((c) => plain(c.name).startsWith(q));
+      if (!q) {
+        this.updateNotices();
+        return;
+      }
+      const hit =
+        this.counties.find((c) => plain(c.name) === q || countySlug(c) === q) ??
+        this.counties.find((c) => plain(c.name).startsWith(q));
     if (hit && hit.active) {
       this.updateQuery({ county: countySlug(hit) });
       input.value = '';
@@ -304,18 +374,25 @@ export class ExploreComponent implements OnInit, AfterViewInit, OnDestroy {
     this.updateNotices();
   }
 
-  selectPoi(poi: Poi, fly: boolean) {
-    this.selectedPoi = poi;
-    this.mapService.selectPOI(poi.id);
-    const c = poi.location?.coordinates;
-    if (fly && c) this.mapService.flyTo(c[0], c[1], Math.max(this.mapZoom, 12));
-    if (fly) this.mobileView = 'map';
-    // keep the matching result card visible in the list
-    setTimeout(() => document.getElementById('poi-' + poi.id)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
+  activateCountyRandom() {
+    this.countyFilterEngaged = true;
+    this.randomSeed = Date.now();
+    this.reload$.next();
   }
 
-  closePoi() {
-    this.selectedPoi = undefined;
+  selectCard(card: ExploreCard, fly: boolean) {
+    this.selectedCard = card;
+    if (card.kind === 'poi') {
+      this.mapService.selectPOI(card.id);
+    }
+    const c = card.location?.coordinates;
+    if (fly && c) this.mapService.flyTo(c[0], c[1], Math.max(this.mapZoom, 12));
+    if (fly) this.mobileView = 'map';
+    setTimeout(() => document.getElementById('card-' + card.kind + '-' + card.id)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
+  }
+
+  closeDetail() {
+    this.selectedCard = undefined;
     this.mapService.selectPOI(null);
   }
 
@@ -323,11 +400,138 @@ export class ExploreComponent implements OnInit, AfterViewInit, OnDestroy {
     this.reload$.next();
   }
 
-  hoverPoi(id: string | null) {
-    this.mapService.highlightPOI(id);
+  hoverCard(card: ExploreCard | null) {
+    if (!card || card.kind !== 'poi') {
+      this.mapService.highlightPOI(null);
+      return;
+    }
+    this.mapService.highlightPOI(card.id);
   }
 
   setMobileView(view: 'map' | 'list') {
     this.mobileView = view;
+  }
+
+  setEventDatePreset(preset: EventDatePreset) {
+    this.eventDatePreset = preset;
+    if (preset !== 'fixed') {
+      this.eventFixedDate = '';
+    }
+    this.reload$.next();
+  }
+
+  onEventDaysWindowChange(days: number) {
+    this.eventDaysWindow = Math.max(1, Math.min(30, days));
+    this.eventDatePreset = 'nextDays';
+    this.reload$.next();
+  }
+
+  onFixedDateChange(value: string) {
+    this.eventFixedDate = value;
+    this.eventDatePreset = value ? 'fixed' : 'any';
+    this.reload$.next();
+  }
+
+  private getEventDaysApiParam(): number | undefined {
+    if (this.eventDatePreset === 'today') return 1;
+    if (this.eventDatePreset === 'tomorrow') return 2;
+    if (this.eventDatePreset === 'nextDays') return this.eventDaysWindow;
+    if (this.eventDatePreset === 'fixed') return 60;
+    return 30;
+  }
+
+  private filterEventsByDate(events: AppEvent[]): AppEvent[] {
+    const today = this.toDateOnly(new Date());
+    return events.filter((event) => {
+      const start = new Date(event.startTime);
+      if (Number.isNaN(start.getTime())) return false;
+      const startDate = this.toDateOnly(start);
+      if (this.eventDatePreset === 'today') {
+        return startDate === today;
+      }
+      if (this.eventDatePreset === 'tomorrow') {
+        const tomorrow = this.addDays(today, 1);
+        return startDate === tomorrow;
+      }
+      if (this.eventDatePreset === 'nextDays') {
+        const from = today;
+        const to = this.addDays(today, this.eventDaysWindow);
+        return startDate >= from && startDate <= to;
+      }
+      if (this.eventDatePreset === 'fixed' && this.eventFixedDate) {
+        return startDate === this.eventFixedDate;
+      }
+      return true;
+    });
+  }
+
+  private limitCards(cards: ExploreCard[]): ExploreCard[] {
+    if (!this.shouldRandomizeCards) {
+      return cards.slice(0, MAX_VISIBLE_CARDS);
+    }
+    return [...cards]
+      .sort((a, b) => this.seededRank(a) - this.seededRank(b))
+      .slice(0, MAX_VISIBLE_CARDS);
+  }
+
+  private seededRank(card: ExploreCard): number {
+    const s = `${this.randomSeed}:${card.kind}:${card.id}`;
+    let hash = 2166136261;
+    for (let i = 0; i < s.length; i++) {
+      hash ^= s.charCodeAt(i);
+      hash = Math.imul(hash, 16777619);
+    }
+    return hash >>> 0;
+  }
+
+  private poiToCard(poi: Poi): ExploreCard {
+    return {
+      kind: 'poi',
+      id: poi.id,
+      title: poi.name,
+      category: poi.category,
+      description: poi.description,
+      sponsored: poi.sponsored,
+      source: poi.source,
+      website: poi.website,
+      address: poi.address,
+      phone: poi.phone,
+      location: poi.location,
+    };
+  }
+
+  private eventToCard(event: AppEvent): ExploreCard {
+    const startTime = event.startTime ? new Date(event.startTime) : undefined;
+    const endTime = event.endTime ? new Date(event.endTime) : undefined;
+    return {
+      kind: 'event',
+      id: event.id,
+      title: event.title,
+      category: 'event',
+      description: event.description,
+      sponsored: event.sponsored,
+      source: 'events',
+      sourceUrl: event.sourceUrl,
+      website: event.sourceUrl,
+      location: event.location,
+      startTime,
+      endTime,
+      venue: event.venue,
+      settlement: event.settlement,
+    };
+  }
+
+  private toDateOnly(date: Date): string {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  private addDays(dateOnly: string, days: number): string {
+    const [y, m, d] = dateOnly.split('-').map(Number);
+    const dt = new Date(y, m - 1, d);
+    dt.setDate(dt.getDate() + days);
+    return this.toDateOnly(dt);
   }
 }

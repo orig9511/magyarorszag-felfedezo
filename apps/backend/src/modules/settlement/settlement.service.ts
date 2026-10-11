@@ -1,7 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Like } from 'typeorm';
-import { Settlement } from './settlement.entity';
+import { Injectable, Logger } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository, Like } from "typeorm";
+import { Settlement } from "./settlement.entity";
 
 /**
  * Settlement service for resolving city/town names to county IDs.
@@ -30,7 +30,7 @@ export class SettlementService {
     // Exact match
     const exact = await this.settlementRepo.findOne({
       where: { name: settlementName },
-      select: ['countyId'],
+      select: ["countyId"],
     });
 
     if (exact) {
@@ -41,11 +41,13 @@ export class SettlementService {
     // Fuzzy fallback: case-insensitive, substring match
     const fuzzy = await this.settlementRepo.findOne({
       where: { name: Like(`%${settlementName}%`) },
-      select: ['countyId'],
+      select: ["countyId"],
     });
 
     if (fuzzy) {
-      this.logger.warn(`Fuzzy settlement match: "${settlementName}" → "${fuzzy.countyId}"`);
+      this.logger.warn(
+        `Fuzzy settlement match: "${settlementName}" → "${fuzzy.countyId}"`,
+      );
       this.settlementsCache.set(settlementName, fuzzy.countyId);
       return fuzzy.countyId;
     }
@@ -60,7 +62,7 @@ export class SettlementService {
   async getSettlementsByCounty(countyId: string): Promise<Settlement[]> {
     return this.settlementRepo.find({
       where: { countyId },
-      order: { name: 'ASC' },
+      order: { name: "ASC" },
     });
   }
 
@@ -69,7 +71,7 @@ export class SettlementService {
    */
   async warmCache(): Promise<void> {
     const settlements = await this.settlementRepo.find({
-      select: ['name', 'countyId'],
+      select: ["name", "countyId"],
     });
 
     for (const s of settlements) {

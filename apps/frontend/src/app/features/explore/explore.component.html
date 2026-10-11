@@ -8,7 +8,17 @@
     <form class="search" role="search" (submit)="$event.preventDefault(); searchCounty(q.value, q)">
       <label for="county-search" class="sr-only">Vármegye keresése</label>
       <lucide-icon [img]="icons.Search" [size]="18" [strokeWidth]="1.75"></lucide-icon>
-      <input #q id="county-search" type="search" list="county-options" placeholder="Keress vármegyét…" autocomplete="off" (change)="searchCounty(q.value, q)" />
+      <input
+        #q
+        id="county-search"
+        type="search"
+        list="county-options"
+        placeholder="Keress vármegyét…"
+        autocomplete="off"
+        (focus)="activateCountyRandom()"
+        (click)="activateCountyRandom()"
+        (change)="searchCounty(q.value, q)"
+      />
       <datalist id="county-options">
         <option *ngFor="let c of counties" [value]="c.name"></option>
       </datalist>
@@ -35,7 +45,7 @@
       </button>
     </div>
 
-    <span class="chip county-chip on" *ngIf="selectedCounty">
+    <span class="chip county-chip on" *ngIf="selectedCounty" (click)="activateCountyRandom()" (keydown.enter)="activateCountyRandom()" role="button" tabindex="0">
       Vármegye: <strong>{{ selectedCounty.name }}</strong>
       <button type="button" class="x" (click)="removeCounty()" [attr.aria-label]="selectedCounty.name + ' szűrő törlése'"><lucide-icon [img]="icons.X" [size]="14" [strokeWidth]="2"></lucide-icon></button>
     </span>
@@ -48,7 +58,7 @@
     <section class="results" aria-labelledby="results-title">
       <div class="res-head">
         <h1 id="results-title">
-          <ng-container *ngIf="poiState === 'ready'">{{ visiblePOIs.length }} hely a látható területen</ng-container>
+          <ng-container *ngIf="poiState === 'ready'">{{ visibleCards.length }} kártya (max 20<span *ngIf="shouldRandomizeCards">, véletlenszerű</span>)</ng-container>
           <ng-container *ngIf="poiState === 'loading'">Helyek betöltése…</ng-container>
           <ng-container *ngIf="poiState === 'error'">Helyek</ng-container>
         </h1>
@@ -56,39 +66,40 @@
       </div>
 
       <ul class="poi-list" aria-live="polite">
-        <li *ngFor="let poi of visiblePOIs" [id]="'poi-' + poi.id">
+        <li *ngFor="let card of visibleCards" [id]="'card-' + card.kind + '-' + card.id">
           <article
             class="poi"
-            [class.is-selected]="selectedPoi?.id === poi.id"
-            (mouseenter)="hoverPoi(poi.id)"
-            (mouseleave)="hoverPoi(null)"
+            [class.is-selected]="selectedCard?.kind === card.kind && selectedCard?.id === card.id"
+            [class.is-event]="card.kind === 'event'"
+            (mouseenter)="hoverCard(card)"
+            (mouseleave)="hoverCard(null)"
           >
-            <div class="thumb" [attr.data-cat]="poi.category">
-              <img *ngIf="safeUrl(poi.imageUrl) && !failedImages.has(poi.id)" [src]="safeUrl(poi.imageUrl)" alt="" loading="lazy" (error)="failedImages.add(poi.id)" />
-              <span class="ph" *ngIf="!safeUrl(poi.imageUrl) || failedImages.has(poi.id)" aria-hidden="true">{{ categoryLabel(poi.category).charAt(0) }}</span>
+            <div class="thumb" [attr.data-cat]="card.category">
+              <span class="ph" aria-hidden="true">{{ categoryLabel(card.category).charAt(0) }}</span>
             </div>
             <div class="body">
               <p class="cat">
-                {{ categoryLabel(poi.category) }}
-                <span class="tag" *ngIf="poi.sponsored">Szponzorált</span>
-                <span class="tag sample" *ngIf="poi.source === 'dev-sample'">Mintaadat</span>
+                {{ categoryLabel(card.category) }}
+                <span class="tag" *ngIf="card.sponsored">Szponzorált</span>
+                <span class="tag event" *ngIf="card.kind === 'event'">Esemény</span>
               </p>
               <h2>
-                <button type="button" class="poi-btn" (click)="selectPoi(poi, true)" [attr.aria-pressed]="selectedPoi?.id === poi.id">{{ poi.name }}</button>
+                <button type="button" class="poi-btn" (click)="selectCard(card, true)" [attr.aria-pressed]="selectedCard?.kind === card.kind && selectedCard?.id === card.id">{{ card.title }}</button>
               </h2>
-              <p class="addr" *ngIf="poi.address">{{ poi.address }}</p>
-              <p class="desc" *ngIf="poi.description">{{ poi.description }}</p>
+              <p class="addr" *ngIf="card.kind === 'poi' && card.address">{{ card.address }}</p>
+              <p class="addr" *ngIf="card.kind === 'event'">{{ formatEventDate(card.startTime) }}<span *ngIf="card.venue"> · {{ card.venue }}</span></p>
+              <p class="desc" *ngIf="card.description">{{ card.description }}</p>
             </div>
           </article>
         </li>
       </ul>
 
-      <div class="state" *ngIf="poiState === 'loading' && !visiblePOIs.length"><p>Helyek betöltése…</p></div>
+      <div class="state" *ngIf="poiState === 'loading' && !visibleCards.length"><p>Helyek betöltése…</p></div>
       <div class="state error" *ngIf="poiState === 'error'" role="alert">
         <p>A helyek nem tölthetők be. Fut a háttérszolgáltatás?</p>
         <button type="button" (click)="retry()">Újrapróbálom</button>
       </div>
-      <div class="state" *ngIf="poiState === 'ready' && visiblePOIs.length === 0">
+      <div class="state" *ngIf="poiState === 'ready' && visibleCards.length === 0">
         <p *ngIf="!selectedCategories.size">Ebben a nézetben nincs találat. Mozgasd vagy nagyítsd a térképet, vagy tekintsd meg az egész országot.</p>
         <p *ngIf="selectedCategories.size && elsewhereCount === 0">Ehhez a szűrőhöz még nincs adat az adatbázisban.</p>
         <ng-container *ngIf="selectedCategories.size && elsewhereCount">
@@ -111,31 +122,55 @@
         <button type="button" *ngIf="selectedCounty" (click)="removeCounty()">Vármegye törlése</button>
       </div>
 
+      <aside class="event-date-panel" *ngIf="showEventDateFilters" role="group" aria-label="Esemény dátumszűrő">
+        <header>
+          <p>Eseményidő</p>
+          <small>{{ mapZoom >= 10 ? 'Közelített nézet' : 'Esemény kategória' }}</small>
+        </header>
+        <div class="preset-grid">
+          <button type="button" [class.on]="eventDatePreset === 'today'" (click)="setEventDatePreset('today')">Ma</button>
+          <button type="button" [class.on]="eventDatePreset === 'tomorrow'" (click)="setEventDatePreset('tomorrow')">Holnap</button>
+          <button type="button" [class.on]="eventDatePreset === 'nextDays'" (click)="setEventDatePreset('nextDays')">Következő napok</button>
+          <button type="button" [class.on]="eventDatePreset === 'fixed'" (click)="setEventDatePreset('fixed')">Fix dátum</button>
+        </div>
+        <div class="slider-wrap" *ngIf="eventDatePreset === 'nextDays'">
+          <label for="days-window">Időtáv: +{{ eventDaysWindow }} nap</label>
+          <input id="days-window" type="range" min="1" max="30" [value]="eventDaysWindow" (input)="onEventDaysWindowChange(+($any($event.target).value))" />
+        </div>
+        <div class="fixed-wrap" *ngIf="eventDatePreset === 'fixed'">
+          <label for="fixed-date">Dátum</label>
+          <input id="fixed-date" type="date" [value]="eventFixedDate" (change)="onFixedDateChange($any($event.target).value)" />
+        </div>
+      </aside>
+
       <div class="map-notice" *ngIf="mapError" role="alert">A térkép nem érhető el: {{ mapError }}</div>
 
-      <aside class="detail" *ngIf="selectedPoi" aria-label="Hely részletei">
-        <button type="button" class="close" (click)="closePoi()" aria-label="Részletek bezárása"><lucide-icon [img]="icons.X" [size]="18" [strokeWidth]="1.75"></lucide-icon></button>
+      <aside class="detail" *ngIf="selectedCard" aria-label="Hely részletei">
+        <button type="button" class="close" (click)="closeDetail()" aria-label="Részletek bezárása"><lucide-icon [img]="icons.X" [size]="18" [strokeWidth]="1.75"></lucide-icon></button>
         <p class="cat">
-          {{ categoryLabel(selectedPoi.category) }}
-          <span class="tag" *ngIf="selectedPoi.sponsored">Szponzorált</span>
-          <span class="tag sample" *ngIf="selectedPoi.source === 'dev-sample'">Fejlesztési mintaadat</span>
+          {{ categoryLabel(selectedCard.category) }}
+          <span class="tag" *ngIf="selectedCard.sponsored">Szponzorált</span>
+          <span class="tag event" *ngIf="selectedCard.kind === 'event'">Esemény</span>
         </p>
-        <h2>{{ selectedPoi.name }}</h2>
-        <p *ngIf="selectedPoi.description">{{ selectedPoi.description }}</p>
+        <h2>{{ selectedCard.title }}</h2>
+        <p *ngIf="selectedCard.description">{{ selectedCard.description }}</p>
         <dl>
-          <ng-container *ngIf="selectedPoi.address"><dt>Cím</dt><dd>{{ selectedPoi.address }}</dd></ng-container>
-          <ng-container *ngIf="selectedPoi.phone"><dt>Telefon</dt><dd><a [href]="'tel:' + selectedPoi.phone">{{ selectedPoi.phone }}</a></dd></ng-container>
-          <ng-container *ngIf="safeUrl(selectedPoi.website)"><dt>Weboldal</dt><dd><a [href]="safeUrl(selectedPoi.website)" target="_blank" rel="noopener noreferrer">{{ selectedPoi.website }}</a></dd></ng-container>
-          <ng-container *ngIf="selectedPoi.location"><dt>Koordináták</dt><dd>{{ selectedPoi.location.coordinates[1].toFixed(5) }}, {{ selectedPoi.location.coordinates[0].toFixed(5) }}</dd></ng-container>
+          <ng-container *ngIf="selectedCard.kind === 'poi' && selectedCard.address"><dt>Cím</dt><dd>{{ selectedCard.address }}</dd></ng-container>
+          <ng-container *ngIf="selectedCard.kind === 'poi' && selectedCard.phone"><dt>Telefon</dt><dd><a [href]="'tel:' + selectedCard.phone">{{ selectedCard.phone }}</a></dd></ng-container>
+          <ng-container *ngIf="selectedCard.kind === 'event' && selectedCard.startTime"><dt>Időpont</dt><dd>{{ formatEventDate(selectedCard.startTime) }}</dd></ng-container>
+          <ng-container *ngIf="selectedCard.kind === 'event' && selectedCard.venue"><dt>Helyszín</dt><dd>{{ selectedCard.venue }}</dd></ng-container>
+          <ng-container *ngIf="selectedCard.kind === 'event' && selectedCard.settlement"><dt>Település</dt><dd>{{ selectedCard.settlement }}</dd></ng-container>
+          <ng-container *ngIf="safeUrl(selectedCard.website)"><dt>Weboldal</dt><dd><a [href]="safeUrl(selectedCard.website)" target="_blank" rel="noopener noreferrer">{{ selectedCard.website }}</a></dd></ng-container>
+          <ng-container *ngIf="selectedCard.location"><dt>Koordináták</dt><dd>{{ selectedCard.location.coordinates[1].toFixed(5) }}, {{ selectedCard.location.coordinates[0].toFixed(5) }}</dd></ng-container>
         </dl>
-        <a class="osm" *ngIf="osmLink(selectedPoi)" [href]="osmLink(selectedPoi)" target="_blank" rel="noopener noreferrer">Megnyitás az OpenStreetMapon</a>
+        <a class="osm" *ngIf="osmLink(selectedCard)" [href]="osmLink(selectedCard)" target="_blank" rel="noopener noreferrer">Megnyitás az OpenStreetMapon</a>
       </aside>
 
     </section>
   </div>
 
   <div class="mobile-toggle">
-    <button type="button" *ngIf="mobileView === 'map'" (click)="setMobileView('list')"><lucide-icon [img]="icons.List" [size]="18" [strokeWidth]="2"></lucide-icon>Lista ({{ visiblePOIs.length }})</button>
+    <button type="button" *ngIf="mobileView === 'map'" (click)="setMobileView('list')"><lucide-icon [img]="icons.List" [size]="18" [strokeWidth]="2"></lucide-icon>Lista ({{ visibleCards.length }})</button>
     <button type="button" *ngIf="mobileView === 'list'" (click)="setMobileView('map')"><lucide-icon [img]="icons.Map" [size]="18" [strokeWidth]="2"></lucide-icon>Térkép</button>
   </div>
 </div>
