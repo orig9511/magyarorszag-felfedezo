@@ -1,5 +1,6 @@
-import { Component, OnInit, ViewChild, ElementRef } from '@angular/core';
-import { MapService } from './core/services/map.service';
+import { Component, OnInit, OnDestroy, AfterViewInit, ViewChild, ElementRef } from '@angular/core';
+import { Subject, EMPTY, catchError, debounceTime, switchMap, takeUntil, tap } from 'rxjs';
+import { MapService, ViewportBounds } from './core/services/map.service';
 import { POIService } from './core/services/poi.service';
 import { CommonModule } from '@angular/common';
 
@@ -40,19 +41,26 @@ import { CommonModule } from '@angular/common';
 
           <div class="pois-list">
             <h3>Points of Interest</h3>
-            <div class="poi-item" *ngFor="let poi of visiblePOIs">
+            <div class="poi-item" *ngFor="let poi of visiblePOIs" (click)="focusPOI(poi)">
               <h4>{{ poi.name }}</h4>
               <p class="category">{{ poi.category }}</p>
               <p class="description">{{ poi.description }}</p>
             </div>
-            <div class="empty-state" *ngIf="visiblePOIs.length === 0">
-              <p>Zoom in or pan to see points of interest</p>
+            <div class="empty-state" *ngIf="poiState === 'loading'">
+              <p>Loading points of interest…</p>
+            </div>
+            <div class="empty-state error" *ngIf="poiState === 'error'" role="alert">
+              <p>Could not load points of interest. Is the backend running?</p>
+            </div>
+            <div class="empty-state" *ngIf="poiState === 'ready' && visiblePOIs.length === 0">
+              <p>No points of interest in this area yet. Pan, zoom or change the filters.</p>
             </div>
           </div>
         </aside>
 
         <div class="map-container">
           <div #mapElement class="map"></div>
+          <div class="map-notice" *ngIf="mapError" role="alert">Map unavailable: {{ mapError }}</div>
           <div class="map-info">
             <p>{{ mapCenter.lat.toFixed(4) }}, {{ mapCenter.lng.toFixed(4) }} | Zoom: {{ mapZoom }}</p>
           </div>
@@ -181,6 +189,7 @@ import { CommonModule } from '@angular/common';
 
     .map-container {
       flex: 1;
+      min-width: 0;
       display: flex;
       flex-direction: column;
       position: relative;
@@ -188,7 +197,25 @@ import { CommonModule } from '@angular/common';
 
     .map {
       flex: 1;
+      min-height: 0;
       background: #e0e0e0;
+    }
+
+    .map-notice {
+      position: absolute;
+      top: 0.75rem;
+      left: 0.75rem;
+      right: 4rem;
+      padding: 0.5rem 0.75rem;
+      background: #fff3cd;
+      border: 1px solid #e0c36a;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      z-index: 1;
+    }
+
+    .empty-state.error {
+      color: #b00020;
     }
 
     .map-info {
@@ -200,13 +227,19 @@ import { CommonModule } from '@angular/common';
     }
   `]
 })
-export class AppComponent implements OnInit {
-  @ViewChild('mapElement') mapElement!: ElementRef;
+export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
+  @ViewChild('mapElement', { static: true }) mapElement!: ElementRef<HTMLElement>;
 
   mapCenter = { lat: 47.1625, lng: 19.5033 }; // Center of Hungary
   mapZoom = 7;
   visiblePOIs: any[] = [];
   selectedCategories: Set<string> = new Set();
+  poiState: 'loading' | 'ready' | 'error' = 'loading';
+  mapError = '';
+
+  private viewport?: ViewportBounds;
+  private reload$ = new Subject<void>();
+  private destroy$ = new Subject<void>();
 
   constructor(
     private mapService: MapService,
@@ -214,12 +247,50 @@ export class AppComponent implements OnInit {
   ) {}
 
   ngOnInit() {
-    this.initializeMap();
+    this.mapService.viewportChange$.pipe(takeUntil(this.destroy$)).subscribe((v) => {
+      this.viewport = v;
+      this.mapCenter = { lat: (v.minLat + v.maxLat) / 2, lng: (v.minLng + v.maxLng) / 2 };
+      this.mapZoom = Math.round(v.zoom * 10) / 10;
+      this.reload$.next();
+    });
+    this.mapService.status$.pipe(takeUntil(this.destroy$)).subscribe((s) => {
+      this.mapError = s === 'ready' ? '' : s;
+    });
+
+    this.reload$
+      .pipe(
+        debounceTime(250),
+        tap(() => (this.poiState = 'loading')),
+        switchMap(() => {
+          const v = this.viewport;
+          if (!v) return EMPTY;
+          return this.poiService
+            .getPOIsByViewport(v.minLat, v.maxLat, v.minLng, v.maxLng, Array.from(this.selectedCategories))
+            .pipe(
+              catchError((err) => {
+                console.error('POI request failed', err);
+                this.poiState = 'error';
+                return EMPTY;
+              }),
+            );
+        }),
+        takeUntil(this.destroy$),
+      )
+      .subscribe((pois) => {
+        this.visiblePOIs = pois;
+        this.poiState = 'ready';
+        this.mapService.setPOIs(pois);
+      });
   }
 
-  private initializeMap() {
-    // MapLibre GL initialization will happen here
-    console.log('Map initialization starting...');
+  ngAfterViewInit() {
+    this.mapService.initializeMap(this.mapElement.nativeElement, [this.mapCenter.lng, this.mapCenter.lat], this.mapZoom);
+  }
+
+  ngOnDestroy() {
+    this.destroy$.next();
+    this.destroy$.complete();
+    this.mapService.destroy();
   }
 
   toggleCategory(event: any, category: string) {
@@ -228,11 +299,11 @@ export class AppComponent implements OnInit {
     } else {
       this.selectedCategories.delete(category);
     }
-    this.loadPOIs();
+    this.reload$.next();
   }
 
-  private loadPOIs() {
-    // POI loading will happen based on map viewport
-    console.log('Loading POIs for categories:', Array.from(this.selectedCategories));
+  focusPOI(poi: any) {
+    const c = poi.location?.coordinates;
+    if (c) this.mapService.flyTo(c[0], c[1]);
   }
 }
