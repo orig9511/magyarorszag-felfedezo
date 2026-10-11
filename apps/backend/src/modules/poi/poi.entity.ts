@@ -32,6 +32,27 @@ export class POI {
   website!: string;
 
   @Column({ nullable: true })
+  osmType!: string;
+
+  @Column({ nullable: true })
+  osmId!: string;
+
+  @Column({ nullable: true })
+  wikidataQid!: string;
+
+  @Column('simple-array', { nullable: true })
+  altNames!: string[];
+
+  @Column('jsonb', { nullable: true })
+  rawTags!: Record<string, string>;
+
+  @Column('jsonb', { nullable: true })
+  externalRefs!: Record<string, string>;
+
+  @Column({ nullable: true })
+  attribution!: string;
+
+  @Column({ nullable: true })
   imageUrl!: string;
 
   @Column()
@@ -51,4 +72,7 @@ export class POI {
 
   @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP', onUpdate: 'CURRENT_TIMESTAMP' })
   updatedAt!: Date;
+
+  @Column({ type: 'timestamp', nullable: true })
+  importedAt!: Date;
 }

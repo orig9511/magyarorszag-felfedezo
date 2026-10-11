@@ -10,6 +10,8 @@ interface ArtCounty {
   d: string;
 }
 
+type Point2D = [number, number];
+
 // Equirectangular fit around Hungary's mid latitude; 100 SVG units = 1 degree of latitude.
 const LAT0 = 47.2;
 const UNITS_PER_DEG = 100;
@@ -157,18 +159,22 @@ export class CountyArtComponent implements OnInit {
       minY = Math.min(minY, y); maxY = Math.max(maxY, y);
       return [x, y];
     };
-    const raw = list.map((c) => ({
+    const raw = list.map((c): { id: string; name: string; slug: string; rings: Point2D[][] } => ({
       id: c.id,
       name: c.name,
       slug: countySlug(c),
-      rings: c.displayGeometry!.coordinates.flatMap((poly) => poly.map((ring) => ring.map(project))),
+      rings: c.displayGeometry!.coordinates.flatMap((poly: number[][][]) =>
+        poly.map((ring: number[][]) => ring.map(project) as Point2D[]),
+      ),
     }));
     const f = (n: number) => (Math.round(n * 10) / 10).toString();
     this.counties = raw.map((c) => ({
       id: c.id,
       name: c.name,
       slug: c.slug,
-      d: c.rings.map((r) => 'M' + r.map(([x, y]) => `${f(x - minX)} ${f(y - minY)}`).join('L') + 'Z').join(''),
+      d: c.rings
+        .map((r: Point2D[]) => 'M' + r.map(([x, y]: Point2D) => `${f(x - minX)} ${f(y - minY)}`).join('L') + 'Z')
+        .join(''),
     }));
     const w = maxX - minX;
     this.viewBox = `0 0 ${f(w)} ${f(maxY - minY)}`;

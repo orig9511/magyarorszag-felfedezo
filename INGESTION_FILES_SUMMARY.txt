@@ -1,0 +1,86 @@
+=== DATA INGESTION IMPLEMENTATION ===
+
+CREATED FILES (14 TypeScript files + 1 SQL migration + 2 docs):
+
+Backend TypeScript Modules:
+  apps/backend/src/modules/event/
+    - event.entity.ts         (Event ORM entity with spatial & source tracking)
+    - event.service.ts        (Event queries, CRUD, lifecycle)
+    - event.controller.ts     (REST endpoints: viewport, upcoming, CRUD)
+    - event.module.ts         (Module definition)
+    - dto/get-events.dto.ts   (Viewport query DTO)
+    - dto/create-event.dto.ts (Event creation DTO)
+
+  apps/backend/src/modules/ingestion/
+    - ingestion.service.ts              (Core: fetch, validate, upsert, track)
+    - ingestion.controller.ts           (REST: /run, /history)
+    - ingestion.module.ts               (Module with schedule setup)
+    - ingestion.scheduler.ts            (Cron jobs: daily OSM, weekly Wikidata)
+    - entities/ingestion-job.entity.ts  (Job tracking schema)
+    - interfaces/data-adapter.interface.ts (Generic adapter contract)
+    - adapters/osm.adapter.ts           (Overpass API → POI ingestion)
+    - adapters/wikidata.adapter.ts      (SPARQL → Cultural POI ingestion)
+
+Database:
+  apps/backend/src/migrations/
+    - 002_add_events_and_ingestion.sql  (events + ingestion_jobs tables)
+
+Documentation:
+  - docs/ingestion-module.md                  (Architecture & usage guide)
+  - IMPLEMENTATION_INGESTION_SUMMARY.md       (Detailed implementation notes)
+
+MODIFIED FILES:
+  - apps/backend/package.json (added @nestjs/schedule)
+  - apps/backend/src/app.module.ts (imported EventModule, IngestionModule)
+
+=== BUILD STATUS ===
+✅ TypeScript compilation: SUCCESS
+✅ NestJS build: SUCCESS
+✅ No deployment errors or warnings
+
+=== NEW API ENDPOINTS ===
+
+Ingestion Control:
+  POST   /api/ingestion/run?source=osm|wikidata   (manual trigger)
+  GET    /api/ingestion/history?source=X&limit=10 (job history)
+
+Events Discovery:
+  GET    /api/events/viewport?minLat=...&minLon=... (spatial query)
+  GET    /api/events/upcoming/:countyId?days=7      (coming soon)
+  GET    /api/events/:id                            (detail)
+
+Event Management:
+  POST   /api/events                   (create)
+  PATCH  /api/events/:id               (update)
+  PATCH  /api/events/:id/cancel        (soft-delete)
+
+=== KEY ARCHITECTURAL FEATURES ===
+
+✅ Source Tracking:  Every record tracks origin, external ID, URL, license
+✅ Deduplication:    (source, sourceId) unique constraint prevents duplicates
+✅ License Compliance:
+    - OSM: Kept separate (ODbL share-alike restriction)
+    - Wikidata: CC0 (merge-friendly)
+    - Partners: Agreement tracking
+✅ Error Handling:    Partial ingestion; errors logged per-record
+✅ Job Tracking:      Audit trail of all ingestion runs
+✅ Scheduled Runs:    Daily OSM, weekly Wikidata (extensible)
+✅ Spatial Support:   PostGIS Point geometry + GIST indexes
+
+=== NOT YET VERIFIED (requires local DB + Docker) ===
+- Database migration execution
+- Adapter real data fetch (Overpass, Wikidata APIs)
+- Scheduled job execution
+- REST API functionality
+- Event query with viewport filtering
+
+=== IMMEDIATE NEXT STEPS ===
+1. Run migrations: docker-compose up, then migrations auto-load
+2. Test ingestion: curl POST /api/ingestion/run?source=osm
+3. Check results: curl GET /api/ingestion/history
+4. Verify job records in DB: SELECT * FROM ingestion_jobs
+
+=== DATA SOURCES CONFIGURED ===
+- OpenStreetMap (Overpass API): POIs in Debrecen area
+- Wikidata (SPARQL): Museums, monuments, cultural sites
+- (Partner APIs: Setup ready, awaiting agreements)

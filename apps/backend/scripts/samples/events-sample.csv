@@ -1,0 +1,2 @@
+externalId,title,description,category,eventType,startTime,endTime,timezone,venue,settlement,latitude,longitude,performers,officialEventUrl,ticketUrl,status,isTestData
+sample-csv-001,TESZT ADAT - Budapest Jazz Night,Teszt esemény CSV import validációhoz.,concert,music,2026-12-02T19:00:00,2026-12-02T22:00:00,Europe/Budapest,A38 Hajó,Budapest,47.4769,19.0554,"Teszt Zenekar A; Teszt Zenekar B",https://example.org/test-event-csv,https://example.org/test-event-csv/tickets,active,true

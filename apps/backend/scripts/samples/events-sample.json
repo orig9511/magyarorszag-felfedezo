@@ -1,0 +1,21 @@
+[
+  {
+    "externalId": "sample-json-001",
+    "title": "TESZT ADAT - Budapest Night Run",
+    "description": "Teszt esemény JSON import validációhoz.",
+    "category": "festival",
+    "eventType": "sport",
+    "startTime": "2026-11-15T18:30:00",
+    "endTime": "2026-11-15T21:00:00",
+    "timezone": "Europe/Budapest",
+    "venue": "Városliget",
+    "settlement": "Budapest",
+    "latitude": 47.5149,
+    "longitude": 19.0842,
+    "performers": ["Teszt Előadó 1", "Teszt Előadó 2"],
+    "officialEventUrl": "https://example.org/test-event-json",
+    "ticketUrl": "https://example.org/test-event-json/tickets",
+    "status": "active",
+    "isTestData": true
+  }
+]

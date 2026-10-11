@@ -27,8 +27,15 @@ export class POIService {
         },
       );
 
-    if (dto.categories && dto.categories.length > 0) {
-      query.andWhere('poi.category IN (:...categories)', { categories: dto.categories });
+    const categories = dto.categories
+      ? dto.categories
+          .split(',')
+          .map((item) => item.trim())
+          .filter(Boolean)
+      : [];
+
+    if (categories.length > 0) {
+      query.andWhere('poi.category IN (:...categories)', { categories });
     }
 
     if (dto.countyId) {
