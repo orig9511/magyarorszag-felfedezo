@@ -179,6 +179,8 @@ export class MapService {
     this.resizeObserver?.disconnect();
     this.map?.remove();
     this.map = undefined;
+    this.hoveredCountyId = undefined;
+    this.selectedCountyId = undefined;
   }
 
   private setSelected(id?: string) {
