@@ -90,12 +90,12 @@ main:focus, section:focus { outline: none; }
 .hero-bg {
   position: absolute; inset: 0; z-index: -1;
   background: radial-gradient(120% 90% at 20% 10%, #1c2a1d 0%, $bg 65%);
-  img { width: 100%; height: 100%; object-fit: cover; object-position: 30% 55%; opacity: 0.8; filter: saturate(0.95) contrast(1.05); }
+  img { width: 100%; height: 100%; object-fit: cover; object-position: 30% 55%; opacity: 0.95; filter: saturate(1.05) contrast(1.05) brightness(1.15); }
   &::after {
     content: ''; position: absolute; inset: 0;
     background:
-      linear-gradient(90deg, rgba(7, 11, 9, 0.9) 0%, rgba(7, 11, 9, 0.55) 45%, rgba(7, 11, 9, 0.25) 65%, rgba(7, 11, 9, 0.7) 100%),
-      linear-gradient(180deg, rgba(7, 11, 9, 0.25) 0%, transparent 35%, $bg 100%);
+      linear-gradient(90deg, rgba(7, 11, 9, 0.82) 0%, rgba(7, 11, 9, 0.42) 48%, rgba(7, 11, 9, 0.12) 68%, rgba(7, 11, 9, 0.5) 100%),
+      linear-gradient(180deg, rgba(7, 11, 9, 0.15) 0%, transparent 40%, $bg 100%);
   }
 }
 .hero-grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr); gap: clamp(2rem, 5vw, 4.5rem); align-items: center; }
@@ -151,7 +151,6 @@ main:focus, section:focus { outline: none; }
   transition: border-color 0.25s;
   &:hover, &:focus-within { border-color: rgba(198, 240, 90, 0.55); }
   &:focus-within { outline: 2px solid $lime; outline-offset: 3px; }
-  &.card-wide { grid-column: span 8; }
 }
 .card-media { position: relative; aspect-ratio: 16 / 10; overflow: hidden; background: linear-gradient(135deg, #1b2b22, $forest);
   img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.9s cubic-bezier(0.2, 0.7, 0.2, 1); } }
@@ -209,8 +208,7 @@ main:focus, section:focus { outline: none; }
 /* ---------- responsive ---------- */
 @media (max-width: 1100px) {
   .cat-grid { grid-template-columns: repeat(3, 1fr); }
-  .card, .card.card-wide { grid-column: span 6; }
-  .card.card-wide { grid-column: span 12; }
+  .card { grid-column: span 6; }
 }
 @media (max-width: 960px) {
   .site-header .nav-desktop { display: none; }
@@ -226,7 +224,7 @@ main:focus, section:focus { outline: none; }
   .wrap { width: min(1280px, 100% - 2rem); }
   .cat-grid { grid-template-columns: 1fr 1fr; gap: 0.75rem; }
   .cat-grid li:last-child { grid-column: span 2; aspect-ratio: 16 / 7; }
-  .card, .card.card-wide { grid-column: span 12; }
+  .card { grid-column: span 12; }
   .cta-row { flex-direction: column; }
   .cta-row .btn { width: 100%; }
   .btn-lg { white-space: normal; width: 100%; }

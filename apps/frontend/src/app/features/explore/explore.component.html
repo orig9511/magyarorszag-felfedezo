@@ -102,6 +102,9 @@
         <button type="button" (click)="showWholeCountry()">Teljes ország mutatása</button>
         <button type="button" *ngIf="hasActiveFilters" (click)="resetFilters()">Szűrők törlése</button>
       </div>
+      <p class="credit" *ngIf="countyAttribution || countyError">
+        <span class="err" *ngIf="countyError">{{ countyError }} </span>Vármegyehatárok: {{ countyAttribution }}
+      </p>
     </section>
 
     <section class="mapwrap" aria-label="Térkép">
@@ -132,9 +135,6 @@
         <a class="osm" *ngIf="osmLink(selectedPoi)" [href]="osmLink(selectedPoi)" target="_blank" rel="noopener noreferrer">Megnyitás az OpenStreetMapon</a>
       </aside>
 
-      <p class="mapfoot" *ngIf="countyAttribution || countyError">
-        <span class="err" *ngIf="countyError">{{ countyError }} </span>{{ countyAttribution }}
-      </p>
     </section>
   </div>
 

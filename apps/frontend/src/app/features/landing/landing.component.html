@@ -133,7 +133,7 @@
         </p>
       </div>
       <div class="cards">
-        <article class="card reveal" *ngFor="let d of inspirations; let i = index" [class.card-wide]="i === 0">
+        <article class="card reveal" *ngFor="let d of inspirations; let i = index">
           <div class="card-media">
             <img
               *ngIf="!failedImages.has(d.key)"

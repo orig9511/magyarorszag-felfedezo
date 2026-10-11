@@ -25,7 +25,7 @@ interface MarkerEntry {
 }
 
 const MAX_MARKERS = 300; // DOM markers are fine up to a few hundred; the API caps a viewport at 1000
-const LABEL_ZOOM = 9; // below this zoom markers are plain dots (labels would overlap)
+const LABEL_ZOOM = 12; // below this zoom markers are plain dots (labels would overlap)
 const COUNTY_SOURCE = 'counties';
 const COUNTY_DETAIL_SOURCE = 'county-detail';
 const EMPTY_FC: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] };
@@ -157,6 +157,8 @@ export class MapService {
       const marker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
         .setLngLat(poi.location!.coordinates as [number, number])
         .addTo(map);
+      // MapLibre sets its own generic aria-label on marker elements; restore the place name.
+      el.setAttribute('aria-label', poi.name);
       this.markers.set(poi.id, { marker, el });
     }
     this.applySelected();
