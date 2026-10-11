@@ -104,6 +104,7 @@ If you prefer to run services locally:
 - `code` (varchar, ISO 3166-2 code)
 - `geometry` (MultiPolygon, 4326 SRID)
 - `active` (boolean)
+- `source`, `sourceId`, `license`, `attribution`, `sourceUpdatedAt` (provenance of the boundary; unique on `source` + `sourceId`)
 - `created_at` (timestamp)
 
 **POIs Table:**
@@ -119,6 +120,29 @@ If you prefer to run services locally:
 - `sponsored` (boolean)
 - `owner_id` (UUID, optional)
 - `created_at`, `updated_at` (timestamp)
+
+### Importing county boundaries
+
+Loads the 19 counties + Budapest from Lechner's INSPIRE Administrative Units (CC BY 4.0, 2019 geometry)
+into the existing local PostgreSQL/PostGIS database. No Docker needed.
+
+```bash
+# 1. Start the backend once in development so TypeORM creates the provenance columns, then stop it.
+# 2. Make sure DATABASE_URL is set in the root .env, and psql + shp2pgsql are available
+#    (they ship with PostgreSQL + the PostGIS bundle; otherwise set PG_BIN to the bin directory).
+npm run import:counties            # download, verify SHA-256, validate, upsert in one transaction
+npm run import:counties -- --verify   # only print counts, geometry types, SRID, validity
+```
+
+- Safe to re-run: rows are matched on (`source`, `sourceId`) and updated only when something changed.
+  Nothing is deleted, `active` is never overwritten, and a failed check rolls everything back.
+- New counties are inserted **inactive**. Activate one explicitly, e.g.
+  `UPDATE counties SET active = true WHERE code = 'HU-HB';`
+- The source dates from 2019. The Csongrád name is corrected to Csongrád-Csanád in the script; other
+  post-2019 changes may be missing.
+- Anything that displays or redistributes these boundaries must show the `attribution` text stored on the rows.
+  Replace "Momap" in the script's `ATTRIBUTION` constant with the legal entity name once it exists.
+- `GET /api/counties` currently returns full-resolution geometry (~0.9 MB for all 20); a simplified layer is still to do.
 
 ### Development Workflow
 

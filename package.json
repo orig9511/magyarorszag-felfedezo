@@ -11,7 +11,8 @@
     "dev": "concurrently \"npm run dev -w apps/backend\" \"npm run dev -w apps/frontend\"",
     "build": "npm run build -w apps/backend && npm run build -w apps/frontend",
     "test": "npm run test -w apps/backend && npm run test -w apps/frontend",
-    "lint": "npm run lint -w apps/backend && npm run lint -w apps/frontend"
+    "lint": "npm run lint -w apps/backend && npm run lint -w apps/frontend",
+    "import:counties": "node scripts/import-counties.mjs"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

@@ -10,8 +10,27 @@ export class CountyService {
     private countyRepository: Repository<County>,
   ) {}
 
-  async getAllCounties(): Promise<County[]> {
-    return this.countyRepository.find({ order: { name: 'ASC' } });
+  /**
+   * Overview list: metadata plus the simplified `displayGeometry` (GeoJSON, 5 decimals ~ 1 m);
+   * the full-resolution `geometry` is left out. Use getCountyGeometry for detailed views.
+   */
+  async getAllCounties(): Promise<Omit<County, 'geometry'>[]> {
+    return this.countyRepository
+      .createQueryBuilder('c')
+      .select([
+        'c.id AS id',
+        'c.name AS name',
+        'c."nameEn" AS "nameEn"',
+        'c.code AS code',
+        'c.active AS active',
+        'c.license AS license',
+        'c.attribution AS attribution',
+        'c.source AS source',
+        'c."sourceId" AS "sourceId"',
+        'ST_AsGeoJSON(c."displayGeometry", 5)::json AS "displayGeometry"',
+      ])
+      .orderBy('c.name', 'ASC')
+      .getRawMany();
   }
 
   async getCountyById(id: string): Promise<County | null> {

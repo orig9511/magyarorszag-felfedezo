@@ -2,6 +2,24 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
+/** Item of `GET /api/counties`: metadata plus the simplified overview geometry (GeoJSON). */
+export interface CountySummary {
+  id: string;
+  name: string;
+  nameEn: string;
+  code: string;
+  active: boolean;
+  displayGeometry: GeoJSON.MultiPolygon | null;
+  license: string | null;
+  attribution: string | null;
+}
+
+/** `GET /api/counties/:id/geometry`: the accurate, full-resolution geometry. */
+export interface CountyGeometry {
+  id: string;
+  geometry: GeoJSON.MultiPolygon;
+}
+
 @Injectable({
   providedIn: 'root',
 })
@@ -10,15 +28,15 @@ export class CountyService {
 
   constructor(private http: HttpClient) {}
 
-  getAllCounties(): Observable<any[]> {
-    return this.http.get<any[]>(this.apiUrl);
+  getAllCounties(): Observable<CountySummary[]> {
+    return this.http.get<CountySummary[]>(this.apiUrl);
   }
 
   getCountyById(id: string): Observable<any> {
     return this.http.get<any>(`${this.apiUrl}/${id}`);
   }
 
-  getCountyGeometry(id: string): Observable<any> {
-    return this.http.get<any>(`${this.apiUrl}/${id}/geometry`);
+  getCountyGeometry(id: string): Observable<CountyGeometry> {
+    return this.http.get<CountyGeometry>(`${this.apiUrl}/${id}/geometry`);
   }
 }

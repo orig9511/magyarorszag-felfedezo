@@ -1,6 +1,7 @@
 import { Component, OnInit, OnDestroy, AfterViewInit, ViewChild, ElementRef } from '@angular/core';
 import { Subject, EMPTY, catchError, debounceTime, switchMap, takeUntil, tap } from 'rxjs';
 import { MapService, ViewportBounds } from './core/services/map.service';
+import { CountyService, CountySummary } from './core/services/county.service';
 import { POIService } from './core/services/poi.service';
 import { CommonModule } from '@angular/common';
 
@@ -62,7 +63,15 @@ import { CommonModule } from '@angular/common';
           <div #mapElement class="map"></div>
           <div class="map-notice" *ngIf="mapError" role="alert">Map unavailable: {{ mapError }}</div>
           <div class="map-info">
-            <p>{{ mapCenter.lat.toFixed(4) }}, {{ mapCenter.lng.toFixed(4) }} | Zoom: {{ mapZoom }}</p>
+            <p>
+              {{ mapCenter.lat.toFixed(4) }}, {{ mapCenter.lng.toFixed(4) }} | Zoom: {{ mapZoom }}
+              <ng-container *ngIf="selectedCounty">
+                | County: <strong>{{ selectedCounty.name }}</strong>
+                <button type="button" class="link" (click)="clearCounty()">clear</button>
+              </ng-container>
+              <span *ngIf="countyError" class="error"> | {{ countyError }}</span>
+            </p>
+            <p class="credit" *ngIf="countyAttribution">{{ countyAttribution }}</p>
           </div>
         </div>
       </main>
@@ -214,6 +223,26 @@ import { CommonModule } from '@angular/common';
       z-index: 1;
     }
 
+    .map-info .credit {
+      margin-top: 0.25rem;
+      font-size: 0.7rem;
+      color: #888;
+    }
+
+    .map-info .error {
+      color: #b00020;
+    }
+
+    .map-info .link {
+      margin-left: 0.5rem;
+      border: 0;
+      background: none;
+      color: #667eea;
+      cursor: pointer;
+      text-decoration: underline;
+      font: inherit;
+    }
+
     .empty-state.error {
       color: #b00020;
     }
@@ -236,6 +265,10 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   selectedCategories: Set<string> = new Set();
   poiState: 'loading' | 'ready' | 'error' = 'loading';
   mapError = '';
+  counties: CountySummary[] = [];
+  selectedCounty?: CountySummary;
+  countyError = '';
+  countyAttribution = '';
 
   private viewport?: ViewportBounds;
   private reload$ = new Subject<void>();
@@ -244,6 +277,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   constructor(
     private mapService: MapService,
     private poiService: POIService,
+    private countyService: CountyService,
   ) {}
 
   ngOnInit() {
@@ -256,6 +290,39 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     this.mapService.status$.pipe(takeUntil(this.destroy$)).subscribe((s) => {
       this.mapError = s === 'ready' ? '' : s;
     });
+
+    this.countyService.getAllCounties().pipe(takeUntil(this.destroy$)).subscribe({
+      next: (counties) => {
+        this.counties = counties;
+        // Credit required by the boundary licence (CC BY 4.0); same text for every row of one source.
+        this.countyAttribution = counties.find((c) => c.attribution)?.attribution ?? '';
+        this.mapService.setCounties(counties);
+      },
+      error: (err) => {
+        console.error('County request failed', err);
+        this.countyError = 'Could not load county boundaries.';
+      },
+    });
+
+    this.mapService.countyClick$
+      .pipe(
+        switchMap((id) =>
+          this.countyService.getCountyGeometry(id).pipe(
+            // Accurate full-resolution geometry for the detailed view, not the simplified overview one.
+            tap((g) => {
+              this.selectedCounty = this.counties.find((c) => c.id === id);
+              this.mapService.showCountyDetail(id, g.geometry);
+            }),
+            catchError((err) => {
+              console.error('County geometry request failed', err);
+              this.countyError = 'Could not load county detail.';
+              return EMPTY;
+            }),
+          ),
+        ),
+        takeUntil(this.destroy$),
+      )
+      .subscribe();
 
     this.reload$
       .pipe(
@@ -300,6 +367,11 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
       this.selectedCategories.delete(category);
     }
     this.reload$.next();
+  }
+
+  clearCounty() {
+    this.selectedCounty = undefined;
+    this.mapService.clearCountyDetail();
   }
 
   focusPOI(poi: any) {
