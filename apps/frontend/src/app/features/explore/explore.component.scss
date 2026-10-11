@@ -16,7 +16,7 @@ h1, h2, p { margin: 0; }
 
 /* ---- top bar ---- */
 .topbar { display: flex; align-items: center; gap: 1.25rem; height: 3.5rem; padding: 0 1.25rem; border-bottom: 1px solid $line; flex: none; }
-.brand { display: inline-flex; align-items: center; gap: 0.45rem; font-family: $serif; font-size: 1.4rem; text-decoration: none; color: $text; svg { color: $lime; } }
+.brand { display: inline-flex; align-items: center; gap: 0.45rem; font-family: $serif; font-size: 1.4rem; text-decoration: none; color: $text; ::ng-deep svg { color: $lime; } }
 .search {
   display: flex; align-items: center; gap: 0.5rem; flex: 1; max-width: 32rem; margin: 0 auto; padding: 0 0.4rem 0 0.9rem; height: 2.4rem;
   border: 1px solid $line; border-radius: 999px; background: rgba(242, 239, 230, 0.05); color: $muted;
@@ -24,20 +24,21 @@ h1, h2, p { margin: 0; }
   input { flex: 1; min-width: 0; background: transparent; border: 0; color: $text; font: inherit; font-size: 0.92rem; outline: none; &::placeholder { color: $muted; } }
   .go { border: 0; background: $lime; color: $bg; font-weight: 600; font-size: 0.82rem; padding: 0.35rem 0.9rem; border-radius: 999px; cursor: pointer; }
 }
-.home { color: $muted; text-decoration: none; font-size: 0.88rem; white-space: nowrap; &:hover { color: $text; } }
+.home { display: inline-flex; align-items: center; gap: 0.35rem; color: $muted; text-decoration: none; font-size: 0.88rem; white-space: nowrap; &:hover { color: $text; } }
 
 /* ---- chip bar ---- */
 .chipbar { display: flex; align-items: center; gap: 0.6rem; padding: 0.6rem 1.25rem; border-bottom: 1px solid $line; flex: none; overflow-x: auto; scrollbar-width: thin; }
+.chip-label { display: inline-flex; flex: none; color: $muted; }
 .chips { display: flex; gap: 0.5rem; }
 .chip {
-  display: inline-flex; align-items: center; gap: 0.4rem; white-space: nowrap; min-height: 2.25rem; padding: 0 0.95rem; font-size: 0.88rem;
+  display: inline-flex; align-items: center; gap: 0.4rem; white-space: nowrap; min-height: 2.25rem; padding: 0 0.95rem 0 0.8rem; font-size: 0.88rem; color: $text;
   border: 1px solid $line; border-radius: 999px; background: transparent; cursor: pointer; transition: border-color 0.2s, background 0.2s, color 0.2s;
-  &:hover { border-color: $lime; }
-  &.on { background: $lime; border-color: $lime; color: $bg; font-weight: 600; }
+  &:hover { border-color: $lime; background: rgba(198, 240, 90, 0.08); }
+  &.on { background: $lime; border-color: $lime; color: $bg; font-weight: 600; &:hover { background: #d6f77f; } .tick { margin-left: -0.1rem; } }
   &.county-chip { cursor: default; border-color: $lime; background: rgba(198, 240, 90, 0.12); color: $text; strong { font-weight: 600; } }
-  .x { border: 0; background: transparent; width: 1.5rem; height: 1.5rem; margin-right: -0.4rem; border-radius: 50%; cursor: pointer; font-size: 1.1rem; line-height: 1; &:hover { background: rgba(242, 239, 230, 0.15); } }
+  .x { display: inline-flex; align-items: center; justify-content: center; border: 0; background: transparent; cursor: pointer; width: 1.5rem; height: 1.5rem; margin-right: -0.4rem; border-radius: 50%; cursor: pointer; font-size: 1.1rem; line-height: 1; &:hover { background: rgba(242, 239, 230, 0.15); } }
 }
-.reset { border: 0; background: transparent; text-decoration: underline; cursor: pointer; white-space: nowrap; color: $text; padding: 0.4rem 0.25rem; }
+.reset { display: inline-flex; align-items: center; gap: 0.35rem; border: 0; background: transparent; text-decoration: underline; cursor: pointer; white-space: nowrap; color: $text; padding: 0.4rem 0.25rem; }
 .notice { margin: 0; color: #ffd77a; font-size: 0.85rem; white-space: nowrap; }
 
 /* ---- split ---- */
@@ -68,7 +69,7 @@ h1, h2, p { margin: 0; }
 .mapwrap { position: relative; min-width: 0; min-height: 0; }
 .map { position: absolute; inset: 0; background: #1a241e; }
 .map-tools { position: absolute; left: 0.8rem; top: 0.8rem; z-index: 2; display: flex; gap: 0.5rem; flex-wrap: wrap;
-  button { background: rgba(7, 11, 9, 0.88); border: 1px solid $line; border-radius: 999px; padding: 0.45rem 0.95rem; font-size: 0.85rem; cursor: pointer; backdrop-filter: blur(4px); &:hover { border-color: $lime; color: $lime; } } }
+  button { display: inline-flex; align-items: center; gap: 0.4rem; background: rgba(7, 11, 9, 0.88); border: 1px solid $line; border-radius: 999px; padding: 0.45rem 0.95rem; font-size: 0.85rem; cursor: pointer; backdrop-filter: blur(4px); &:hover { border-color: $lime; color: $lime; } } }
 .map-notice { position: absolute; left: 0.8rem; right: 4rem; bottom: 3rem; z-index: 2; padding: 0.5rem 0.75rem; background: #fff3cd; color: #333; border-radius: 4px; font-size: 0.85rem; }
 
 .credit { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid $line; font-size: 0.7rem; line-height: 1.4; color: #8a9489; .err { color: #ffb4a8; } }
@@ -84,7 +85,7 @@ h1, h2, p { margin: 0; }
   dt { color: $muted; } dd { margin: 0; word-break: break-word; }
   a { color: $lime; }
   .osm { display: inline-block; margin-top: 0.8rem; font-size: 0.85rem; }
-  .close { position: absolute; right: 0.5rem; top: 0.5rem; width: 2rem; height: 2rem; border: 0; border-radius: 50%; background: transparent; font-size: 1.4rem; cursor: pointer; &:hover { background: rgba(242, 239, 230, 0.12); } }
+  .close { position: absolute; right: 0.5rem; top: 0.5rem; display: inline-flex; align-items: center; justify-content: center; width: 2.25rem; height: 2.25rem; border: 0; border-radius: 50%; background: transparent; cursor: pointer; &:hover { background: rgba(242, 239, 230, 0.12); } }
 }
 
 .mobile-toggle { display: none; }
@@ -93,6 +94,8 @@ h1, h2, p { margin: 0; }
 
 /* ---- tablet / mobile ---- */
 @media (max-width: 900px) {
+  .chip { min-height: 2.75rem; }
+  .reset { min-height: 2.75rem; }
   .split { grid-template-columns: 1fr; }
   .results, .mapwrap { grid-row: 1; grid-column: 1; }
   .split.view-map .results { display: none; }
@@ -104,6 +107,6 @@ h1, h2, p { margin: 0; }
   .chipbar { padding: 0.5rem 0.75rem; }
   .poi { grid-template-columns: 5.5rem 1fr; }
   .mobile-toggle { display: flex; position: fixed; left: 50%; bottom: 3.4rem; transform: translateX(-50%); z-index: 10;
-    button { min-height: 3rem; padding: 0 1.6rem; border: 0; border-radius: 999px; background: $lime; color: $bg; font-weight: 700; font-size: 0.95rem; box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5); cursor: pointer; } }
+    button { display: inline-flex; align-items: center; gap: 0.5rem; min-height: 3rem; padding: 0 1.6rem; border: 0; border-radius: 999px; background: $lime; color: $bg; font-weight: 700; font-size: 0.95rem; box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5); cursor: pointer; } }
   .detail { bottom: 7rem; max-height: 42%; }
 }

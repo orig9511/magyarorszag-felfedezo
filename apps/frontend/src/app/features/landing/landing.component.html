@@ -3,10 +3,7 @@
 <header class="site-header">
   <div class="wrap bar">
     <a class="brand" routerLink="/" aria-label="Momap, főoldal">
-      <svg class="logo" viewBox="0 0 24 24" width="26" height="26" aria-hidden="true" focusable="false">
-        <path d="M12 2.5c-3.6 0-6.5 2.8-6.5 6.4 0 4.6 6.5 12.6 6.5 12.6s6.5-8 6.5-12.6c0-3.6-2.9-6.4-6.5-6.4z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
-        <circle cx="12" cy="9" r="2.4" fill="currentColor" />
-      </svg>
+      <lucide-icon [img]="icons.MapPin" class="logo" [size]="26" [strokeWidth]="1.75"></lucide-icon>
       <span>Momap</span>
     </a>
 
@@ -16,7 +13,7 @@
       <a href="#hogyan" (click)="scrollTo('hogyan', $event)">Hogyan működik?</a>
     </nav>
 
-    <a class="btn btn-primary btn-sm nav-cta" routerLink="/explore">Térkép megnyitása <span aria-hidden="true">→</span></a>
+    <a class="btn btn-primary btn-sm nav-cta" routerLink="/explore">Térkép megnyitása <lucide-icon [img]="icons.ArrowRight" [size]="18" [strokeWidth]="2"></lucide-icon></a>
 
     <button
       type="button"
@@ -34,7 +31,7 @@
     <a href="#kiemelt" (click)="scrollTo('kiemelt', $event)">Kiemelt helyek</a>
     <a href="#kategoriak" (click)="scrollTo('kategoriak', $event)">Kategóriák</a>
     <a href="#hogyan" (click)="scrollTo('hogyan', $event)">Hogyan működik?</a>
-    <a class="btn btn-primary" routerLink="/explore" (click)="menuOpen = false">Térkép megnyitása <span aria-hidden="true">→</span></a>
+    <a class="btn btn-primary" routerLink="/explore" (click)="menuOpen = false">Térkép megnyitása <lucide-icon [img]="icons.ArrowRight" [size]="18" [strokeWidth]="2"></lucide-icon></a>
   </nav>
 </header>
 
@@ -62,7 +59,7 @@
           egyetlen térképen.
         </p>
         <div class="cta-row">
-          <a class="btn btn-primary" routerLink="/explore">Felfedezés indítása <span aria-hidden="true">→</span></a>
+          <a class="btn btn-primary" routerLink="/explore">Felfedezés indítása <lucide-icon [img]="icons.ArrowRight" [size]="18" [strokeWidth]="2"></lucide-icon></a>
           <a class="btn btn-ghost" href="#hogyan" (click)="scrollTo('hogyan', $event)">Hogyan működik?</a>
         </div>
 
@@ -78,7 +75,7 @@
 
       <aside class="map-panel" aria-label="Vármegyetérkép">
         <nav class="panel-chips" aria-label="Kategóriák a térképen">
-          <a *ngFor="let c of categories" routerLink="/explore" [queryParams]="{ category: c.key }">{{ c.name }}</a>
+          <a *ngFor="let c of categories" routerLink="/explore" [queryParams]="{ category: c.key }"><app-category-icon [category]="c.key" [size]="16" />{{ c.name }}</a>
         </nav>
         <app-county-art (loaded)="onCountiesLoaded($event)" />
       </aside>
@@ -114,7 +111,7 @@
               <span class="cat-name">{{ c.name }}</span>
               <span class="cat-text">{{ c.text }}</span>
             </span>
-            <span class="cat-arrow" aria-hidden="true">→</span>
+            <span class="cat-arrow"><lucide-icon [img]="icons.ArrowRight" [size]="20" [strokeWidth]="2"></lucide-icon></span>
           </a>
         </li>
       </ul>
@@ -189,7 +186,7 @@
           döntöd el, merre indulsz.
         </p>
       </div>
-      <a class="btn btn-primary btn-lg" routerLink="/explore">Térkép megnyitása <span aria-hidden="true">→</span></a>
+      <a class="btn btn-primary btn-lg" routerLink="/explore">Térkép megnyitása <lucide-icon [img]="icons.ArrowRight" [size]="18" [strokeWidth]="2"></lucide-icon></a>
     </div>
   </section>
 </main>
@@ -197,9 +194,12 @@
 <footer class="site-footer">
   <div class="wrap">
     <div class="foot-top">
-      <div>
-        <p class="brand foot-brand">Momap</p>
-        <p class="foot-note">Magyarország felfedezője: helyek, programok és élmények térképen.</p>
+      <div class="foot-id">
+        <a class="foot-brand" routerLink="/" aria-label="Momap, főoldal">
+          <lucide-icon [img]="icons.MapPin" [size]="22" [strokeWidth]="1.75"></lucide-icon>
+          <span>Momap</span>
+        </a>
+        <p class="foot-note">Magyarország helyei, programjai és élményei egyetlen térképen.</p>
       </div>
       <nav aria-label="Lábléc menü">
         <a routerLink="/explore">Térkép</a>
@@ -209,31 +209,26 @@
       </nav>
     </div>
 
-    <div class="attribution">
-      <h2>Adatforrások és képek</h2>
-      <ul>
+    <div class="foot-bottom">
+      <p class="copyright">© {{ year }} Momap</p>
+      <ul class="foot-links" aria-label="Tudnivalók">
         <li>
-          Térképadatok és alaptérkép: ©
-          <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap közreműködők</a>
-          (ODbL). A jelenlegi csempeszolgáltató csak fejlesztési célra használható.
+          <button type="button" class="link-btn" aria-haspopup="dialog" (click)="attribution.open()">Adatforrások és licencek</button>
         </li>
-        <li>
-          Vármegyehatárok: a Lechner Tudásközpont adatai alapján, módosítva (vetületi átszámítás, egyszerűsített
-          megjelenítés). Licenc:
-          <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>.
+        <li *ngFor="let l of legalLinks">
+          <a *ngIf="l.route" [routerLink]="l.route">{{ l.label }}</a>
+          <a *ngIf="l.url" [href]="l.url" target="_blank" rel="noopener noreferrer">{{ l.label }}</a>
         </li>
-        <li>
-          Fotók (Wikimedia Commons):
-          <ng-container *ngFor="let c of credits">
-            <a [href]="c.credit.source" target="_blank" rel="noopener">{{ c.label }}</a> – {{ c.credit.author }},
-            <a *ngIf="c.credit.licenseUrl; else plainLicense" [href]="c.credit.licenseUrl" target="_blank" rel="noopener">{{ c.credit.license }}</a>
-            <ng-template #plainLicense>{{ c.credit.license }}</ng-template>;
-          </ng-container>
-          A hőlégballonos és a quados fotó nem magyarországi helyszínt mutat, csak illusztráció.
+      </ul>
+      <ul class="social" *ngIf="socialLinks.length" aria-label="Közösségi média">
+        <li *ngFor="let s of socialLinks">
+          <a [href]="s.url" target="_blank" rel="noopener noreferrer" [attr.aria-label]="s.label + ' (új lapon nyílik meg)'">
+            <lucide-icon [img]="icons.ExternalLink" [size]="18" [strokeWidth]="1.75"></lucide-icon>
+          </a>
         </li>
       </ul>
     </div>
-
-    <p class="copyright">© {{ year }} Momap. Minden jog fenntartva.</p>
   </div>
 </footer>
+
+<app-attribution-dialog #attribution />

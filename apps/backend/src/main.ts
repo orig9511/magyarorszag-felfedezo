@@ -1,6 +1,6 @@
-import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
-import { AppModule } from './app.module';
+import { NestFactory } from "@nestjs/core";
+import { ValidationPipe } from "@nestjs/common";
+import { AppModule } from "./app.module";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -14,7 +14,7 @@ async function bootstrap() {
   );
 
   app.enableCors({
-    origin: ['http://localhost:4200', 'http://localhost:4201', 'http://localhost:3000'],
+    origin: ["http://localhost:4200", "http://localhost:3000"],
     credentials: true,
   });
 

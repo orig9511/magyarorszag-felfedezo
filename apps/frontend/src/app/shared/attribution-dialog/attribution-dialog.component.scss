@@ -1,0 +1,28 @@
+$bg: #070b09;
+$surface: #111d17;
+$line: rgba(242, 239, 230, 0.14);
+$text: #f2efe6;
+$muted: #a9b3a8;
+$lime: #c6f05a;
+$serif: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
+
+.attr-dialog {
+  margin: auto; padding: 0; border: 1px solid $line; border-radius: 16px; background: $surface; color: $text;
+  width: min(42rem, calc(100% - 2rem)); max-height: min(85vh, 85dvh); overflow: hidden;
+  &::backdrop { background: rgba(0, 0, 0, 0.7); }
+  &[open] { display: flex; }
+}
+.panel { display: flex; flex-direction: column; min-height: 0; width: 100%; max-height: inherit; }
+header {
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem 1.25rem; border-bottom: 1px solid $line; flex: none;
+  h2 { font-family: $serif; font-weight: 400; font-size: 1.3rem; }
+}
+.close {
+  display: inline-flex; align-items: center; justify-content: center; width: 2.75rem; height: 2.75rem; margin: -0.4rem -0.5rem -0.4rem 0;
+  border: 0; border-radius: 50%; background: transparent; color: $text; cursor: pointer; transition: background 0.2s;
+  &:hover { background: rgba(242, 239, 230, 0.12); }
+}
+:focus-visible { outline: 2px solid $lime; outline-offset: 2px; }
+ul { list-style: none; margin: 0; padding: 1.1rem 1.25rem 1.4rem; overflow-y: auto; overscroll-behavior: contain; }
+li { color: $muted; font-size: 0.88rem; line-height: 1.55; margin-bottom: 0.9rem; &:last-child { margin-bottom: 0; } }
+a { color: $text; text-underline-offset: 3px; &:hover { color: $lime; } }

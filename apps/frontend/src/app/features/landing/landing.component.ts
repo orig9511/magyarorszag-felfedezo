@@ -2,21 +2,31 @@ import { AfterViewInit, Component, ElementRef, HostListener, OnDestroy } from '@
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { CountyArtComponent } from './county-art.component';
-import { ALL_CREDITS, CATEGORIES, HERO, INSPIRATIONS, STEPS } from './landing-content';
+import { LucideAngularModule } from 'lucide-angular';
+import { ICONS } from '../../shared/icons/icons';
+import { CATEGORIES, HERO, INSPIRATIONS, STEPS } from './landing-content';
+import { AttributionDialogComponent } from '../../shared/attribution-dialog/attribution-dialog.component';
+import { CategoryIconComponent } from '../../shared/icons/category-icon.component';
+import { LEGAL_LINKS, SOCIAL_LINKS } from '../../core/config/site.config';
 
 @Component({
   selector: 'app-landing',
   standalone: true,
-  imports: [CommonModule, RouterLink, CountyArtComponent],
+  imports: [
+    CommonModule, RouterLink, CountyArtComponent, AttributionDialogComponent, CategoryIconComponent,
+    LucideAngularModule,
+  ],
   templateUrl: './landing.component.html',
   styleUrls: ['./landing.component.scss'],
 })
 export class LandingComponent implements AfterViewInit, OnDestroy {
+  readonly icons = ICONS;
   readonly hero = HERO;
   readonly categories = CATEGORIES;
   readonly inspirations = INSPIRATIONS;
   readonly steps = STEPS;
-  readonly credits = ALL_CREDITS;
+  readonly socialLinks = SOCIAL_LINKS;
+  readonly legalLinks = LEGAL_LINKS;
   readonly year = new Date().getFullYear();
 
   /** Number of counties actually returned by the API; null until known (nothing is shown if it fails). */

@@ -13,17 +13,20 @@ Premium map-first tourism and local discovery platform for Hungary.
 ### Quick Start
 
 1. **Clone the repository:**
+
    ```bash
    git clone https://github.com/orig9511/magyarorszag-felfedezo.git
    cd magyarorszag-felfedezo
    ```
 
 2. **Copy the environment file:**
+
    ```bash
    cp .env.example .env
    ```
 
 3. **Start the development environment with Docker Compose:**
+
    ```bash
    docker-compose up
    ```
@@ -43,6 +46,7 @@ Premium map-first tourism and local discovery platform for Hungary.
 If you prefer to run services locally:
 
 1. **Backend:**
+
    ```bash
    cd apps/backend
    npm install
@@ -50,6 +54,7 @@ If you prefer to run services locally:
    ```
 
 2. **Frontend:**
+
    ```bash
    cd apps/frontend
    npm install
@@ -87,27 +92,30 @@ If you prefer to run services locally:
 ### API Endpoints
 
 #### Counties
+
 - `GET /api/counties` — List all counties
 - `GET /api/counties/:id` — Get county details
 - `GET /api/counties/:id/geometry` — Get county geometry (GeoJSON)
 
 #### Points of Interest (POIs)
+
 - `GET /api/pois/viewport?minLat=X&maxLat=Y&minLng=A&maxLng=B&categories=C&countyId=D` — Get POIs in viewport
 - `GET /api/pois/:id` — Get POI details
 
 ### Database Schema
 
 **Counties Table:**
+
 - `id` (UUID, primary key)
 - `name` (varchar, Hungarian name)
 - `name_en` (varchar, English name)
 - `code` (varchar, ISO 3166-2 code)
 - `geometry` (MultiPolygon, 4326 SRID)
 - `active` (boolean)
-- `source`, `sourceId`, `license`, `attribution`, `sourceUpdatedAt` (provenance of the boundary; unique on `source` + `sourceId`)
 - `created_at` (timestamp)
 
 **POIs Table:**
+
 - `id` (UUID, primary key)
 - `name` (varchar)
 - `description` (text)
@@ -120,29 +128,6 @@ If you prefer to run services locally:
 - `sponsored` (boolean)
 - `owner_id` (UUID, optional)
 - `created_at`, `updated_at` (timestamp)
-
-### Importing county boundaries
-
-Loads the 19 counties + Budapest from Lechner's INSPIRE Administrative Units (CC BY 4.0, 2019 geometry)
-into the existing local PostgreSQL/PostGIS database. No Docker needed.
-
-```bash
-# 1. Start the backend once in development so TypeORM creates the provenance columns, then stop it.
-# 2. Make sure DATABASE_URL is set in the root .env, and psql + shp2pgsql are available
-#    (they ship with PostgreSQL + the PostGIS bundle; otherwise set PG_BIN to the bin directory).
-npm run import:counties            # download, verify SHA-256, validate, upsert in one transaction
-npm run import:counties -- --verify   # only print counts, geometry types, SRID, validity
-```
-
-- Safe to re-run: rows are matched on (`source`, `sourceId`) and updated only when something changed.
-  Nothing is deleted, `active` is never overwritten, and a failed check rolls everything back.
-- New counties are inserted **inactive**. Activate one explicitly, e.g.
-  `UPDATE counties SET active = true WHERE code = 'HU-HB';`
-- The source dates from 2019. The Csongrád name is corrected to Csongrád-Csanád in the script; other
-  post-2019 changes may be missing.
-- Anything that displays or redistributes these boundaries must show the `attribution` text stored on the rows.
-  Replace "Momap" in the script's `ATTRIBUTION` constant with the legal entity name once it exists.
-- `GET /api/counties` currently returns full-resolution geometry (~0.9 MB for all 20); a simplified layer is still to do.
 
 ### Development Workflow
 
@@ -210,17 +195,20 @@ This builds both the backend and frontend for production deployment.
 ### Common Issues
 
 **Database connection error:**
+
 ```bash
 # Ensure PostgreSQL is running and accessible
 docker-compose logs postgres
 ```
 
 **Frontend not connecting to backend:**
+
 - Check that the backend API is running on port 3000
 - Verify CORS configuration in `apps/backend/src/main.ts`
 - Check proxy config in `apps/frontend/proxy.conf.json`
 
 **Port already in use:**
+
 ```bash
 # Change port in docker-compose.yml or stop conflicting services
 docker-compose ps

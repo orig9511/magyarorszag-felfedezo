@@ -1,0 +1,31 @@
+<dialog #dlg class="attr-dialog" aria-labelledby="attr-title" (close)="onClosed()" (click)="onDialogClick($event)">
+  <div class="panel">
+    <header>
+      <h2 id="attr-title">Adatforrások és licencek</h2>
+      <button type="button" class="close" (click)="close()" aria-label="Bezárás">
+        <lucide-icon [img]="icons.X" [size]="20" [strokeWidth]="1.75"></lucide-icon>
+      </button>
+    </header>
+    <ul>
+      <li>
+        Térképadatok és alaptérkép: ©
+        <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap közreműködők</a>
+        (ODbL). A jelenlegi csempeszolgáltató csak fejlesztési célra használható.
+      </li>
+      <li>
+        Vármegyehatárok: a Lechner Tudásközpont adatai alapján, módosítva (vetületi átszámítás, egyszerűsített
+        megjelenítés). Licenc:
+        <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>.
+      </li>
+      <li>
+        Fotók (Wikimedia Commons):
+        <ng-container *ngFor="let c of credits">
+          <a [href]="c.credit.source" target="_blank" rel="noopener">{{ c.label }}</a> – {{ c.credit.author }},
+          <a *ngIf="c.credit.licenseUrl; else plainLicense" [href]="c.credit.licenseUrl" target="_blank" rel="noopener">{{ c.credit.license }}</a>
+          <ng-template #plainLicense>{{ c.credit.license }}</ng-template>;
+        </ng-container>
+        A hőlégballonos és a quados fotó nem magyarországi helyszínt mutat, csak illusztráció.
+      </li>
+    </ul>
+  </div>
+</dialog>

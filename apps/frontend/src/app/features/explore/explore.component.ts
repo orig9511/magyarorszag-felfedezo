@@ -9,6 +9,9 @@ import { Poi, POIService } from '../../core/services/poi.service';
 import { CATEGORIES } from '../landing/landing-content';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, ParamMap, Router, RouterLink } from '@angular/router';
+import { LucideAngularModule } from 'lucide-angular';
+import { ICONS } from '../../shared/icons/icons';
+import { CategoryIconComponent } from '../../shared/icons/category-icon.component';
 
 const HUNGARY_BOUNDS = { minLat: 45.5, maxLat: 48.7, minLng: 16, maxLng: 23 };
 
@@ -18,11 +21,15 @@ const plain = (s: string) =>
 @Component({
   selector: 'app-explore',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [
+    CommonModule, RouterLink, CategoryIconComponent,
+    LucideAngularModule,
+  ],
   templateUrl: './explore.component.html',
   styleUrls: ['./explore.component.scss'],
 })
 export class ExploreComponent implements OnInit, AfterViewInit, OnDestroy {
+  readonly icons = ICONS;
   @ViewChild('mapElement', { static: true }) mapElement!: ElementRef<HTMLElement>;
 
   readonly categoryOptions = CATEGORIES.map((c) => ({ key: c.key, name: c.name }));

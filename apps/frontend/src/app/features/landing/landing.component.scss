@@ -118,7 +118,7 @@ main:focus, section:focus { outline: none; }
   max-width: 640px; justify-self: end; width: 100%;
 }
 .panel-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.4rem;
-  a { padding: 0.4rem 0.85rem; font-size: 0.84rem; text-decoration: none; border: 1px solid $line; border-radius: 999px; color: #d3d8cb; transition: border-color 0.2s, color 0.2s, background 0.2s;
+  a { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.4rem 0.85rem; font-size: 0.84rem; text-decoration: none; border: 1px solid $line; border-radius: 999px; color: #d3d8cb; transition: border-color 0.2s, color 0.2s, background 0.2s;
     &:hover { border-color: $lime; color: $lime; background: rgba(198, 240, 90, 0.08); } }
 }
 .hero-credit { position: absolute; right: 1.5rem; bottom: 0.6rem; font-size: 0.68rem; color: #8a9489; a { text-underline-offset: 2px; } }
@@ -177,18 +177,19 @@ main:focus, section:focus { outline: none; }
 .cta-inner h2 { margin-bottom: 1.1rem; }
 
 /* footer */
-.site-footer { padding: 4rem 0 2.5rem; border-top: 1px solid $line; font-size: 0.9rem; }
-.foot-top { display: flex; justify-content: space-between; gap: 2rem; flex-wrap: wrap; margin-bottom: 3rem; }
-.foot-brand { font-family: $serif; font-size: 1.8rem; margin-bottom: 0.5rem; }
+.site-footer { padding: 2.25rem 0 1.25rem; border-top: 1px solid $line; font-size: 0.88rem; }
+.foot-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 1.5rem 2rem; flex-wrap: wrap; padding-bottom: 1.5rem; }
+.foot-brand { display: inline-flex; align-items: center; gap: 0.4rem; font-family: $serif; font-size: 1.5rem; color: $text; text-decoration: none; margin-bottom: 0.4rem; ::ng-deep svg { color: $lime; } }
 .foot-note { color: $muted; max-width: 26rem; }
-.site-footer nav { display: flex; flex-direction: column; gap: 0.6rem; a { color: $muted; text-decoration: none; &:hover { color: $text; text-decoration: underline; } } }
-.attribution {
-  border-top: 1px solid $line; padding-top: 1.8rem;
-  h2 { font-family: $sans; font-size: 0.78rem; letter-spacing: 0.18em; text-transform: uppercase; color: $muted; margin-bottom: 1rem; }
-  li { color: $muted; font-size: 0.8rem; margin-bottom: 0.6rem; max-width: 72rem; }
-  a { color: $text; text-underline-offset: 3px; }
-}
-.copyright { margin-top: 2rem; color: #8a9489; font-size: 0.8rem; }
+.site-footer nav { display: flex; flex-wrap: wrap; gap: 0.25rem 1.5rem; a { display: inline-flex; align-items: center; min-height: 2.25rem; color: $muted; text-decoration: none; &:hover { color: $text; text-decoration: underline; text-underline-offset: 3px; } } }
+.foot-bottom { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 1.5rem; padding-top: 1rem; border-top: 1px solid $line; font-size: 0.8rem; }
+.copyright { color: #8a9489; margin-right: auto; }
+.foot-links, .social { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 1.25rem; list-style: none; margin: 0; padding: 0; }
+.foot-links a, .link-btn { display: inline-flex; align-items: center; min-height: 2.25rem; color: $muted; text-decoration: none; background: none; border: 0; padding: 0; font: inherit; cursor: pointer;
+  &:hover { color: $text; text-decoration: underline; text-underline-offset: 3px; } }
+.social a { display: inline-flex; align-items: center; justify-content: center; width: 2.25rem; height: 2.25rem; border: 1px solid $line; border-radius: 50%; color: $muted; transition: color 0.2s, border-color 0.2s;
+  &:hover { color: $lime; border-color: $lime; } }
+.site-footer :focus-visible { outline: 2px solid $lime; outline-offset: 2px; border-radius: 4px; }
 
 /* ---------- motion ---------- */
 .hero-copy > * { animation: rise 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
