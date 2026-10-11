@@ -1,368 +1,130 @@
 # License & Compliance Analysis
 
-## Executive Legal Summary
+**Status:** Audit draft, revised 2026-10-11 by a verification pass. This is not legal advice. Points marked "legal review" should go to a qualified lawyer before launch.
+**Evidence tags:** VERIFIED / INFERRED / UNVERIFIED / BLOCKED (see `01`). **Sources:** `_sources-licensing.md`.
+**Approved constraints (2026-10-11):** proprietary closed-source platform. TREK, TRIP, Mobilizon, and Tokoro are reference-only (no code copying, not run as services). The only third-party runtime dependencies are Leaflet, PostGIS, and one CMS. Solo developer, small EU VPS.
 
-**RECOMMENDATION:** Use only MIT/BSD-2-Clause licensed stack to eliminate legal ambiguity.
+## Executive summary
 
-**BLOCKING ISSUE:** AGPL v3 licenses (TREK, Mobilizon) are **NOT COMPATIBLE** with proprietary commercial platform. Network copyleft clause demands open-sourcing entire codebase.
+| Topic | Revised position | Tag |
+|---|---|---|
+| AGPL (TREK, Mobilizon) | Not a blocker any more: neither code nor services are used (**APPROVED** reference-only policy). Main residual risk is copying code by mistake | INFERRED |
+| MPL-2.0 (Tokoro) | Same. No files, prompts, or snippets copied | INFERRED |
+| MIT (TRIP) | Reuse would be allowed with a notice, but the policy is reference-only | VERIFIED (license) / APPROVED (policy) |
+| GPL-2.0+ (PostGIS) | Separate DB server, unmodified, accessed via SQL: very likely no obligations for the app. Legal review **advisable, not blocking** | INFERRED |
+| BSD-2-Clause (Leaflet) | Keep the copyright notice in distributed JS bundles | VERIFIED (license) |
+| Strapi | **MIT core plus Enterprise-licensed parts**, some of which ship in a default install. Needs care. See §5 | VERIFIED (license files) |
+| Directus v12 | **MSCL-1.0**, source-available, not OSI. Our use is not a "Competing Use". Free full access via the Innovation Grant if under $5M revenue and 50 employees. Otherwise Core-tier limits apply. See §6 | VERIFIED (texts) / INFERRED (application) |
+| OSM/ODbL, Wikidata, others | Handled in `04`/`05`. §7 is only a summary | partly UNVERIFIED |
 
-**GPL v2 ISSUE (PostGIS):** Manageable IF architecture maintains PostGIS as external unmodified database service. Requires legal opinion on "linking vs. aggregation" interpretation.
-
-**MSCL ISSUE (Directus):** Commercial licensing requirement for organizations >$5M revenue eliminates advantage over Strapi MIT alternative.
-
----
-
-## 1. AGPL v3 License: Network Copyleft Risk
-
-### License Terms (Section 13 - Network Interaction)
-The AGPL v3 Network Interaction clause states:
-
-> "If you convey [the program] in a form designed to require or permit, at the time a user of the computer network uses it, that the person using the computer to access it will have already received a copy... or been offered such a copy..."
-
-### What This Means
-
-**Trigger Event:** Users access TREK or Mobilizon features through your web platform over a network
-
-**Obligation:** You must offer source code download to all users (at minimal/no cost)
-
-**Scope:** Applies to entire platform if TREK/Mobilizon is "integrated" (definition contested in court)
-
-### Legal Interpretations
-
-**Interpretation A (Restrictive):** "Integration" means any code sharing, data flow, or shared database. Entire codebase must be AGPL.
-
-**Interpretation B (Permissive):** "Integration" means functional dependency only. If TREK runs as completely separate service via API, only TREK portion must be AGPL.
-
-**Current Case Law:**
-- **Red Hat vs. Artifex (pending):** Will clarify copyleft scope
-- **Most courts lean toward:** Interpretations A (restrictive)
-
-### For Momap Platform
-
-**Scenario A: Direct Integration (TREK code merged into platform)**
-- ❌ **ILLEGAL for proprietary commercial platform**
-- Must open-source entire codebase under AGPL
-- No exception for "commercial wrapper"
-
-**Scenario B: API Integration (TREK runs separately)**
-- ⚠️ **LEGALLY UNCERTAIN**
-- Depends on integration depth and jurisdiction
-- Highest legal risk: platform authenticates TREK users, shows TREK data in UI
-
-**Scenario C: Federated Integration (Mobilizon ActivityPub)**
-- ⚠️ **LEGALLY UNCERTAIN**
-- If you query Mobilizon federation but don't modify code: might be compliant
-- If you proxy Mobilizon events: integration risk
-
-### Compliance Paths
-
-1. ✅ **Build custom event management (in-house)** — Eliminates AGPL dependency
-2. ✅ **Obtain commercial license** — Contact TREK/Mobilizon maintainers for exception (cost unknown, likely >€5K/year)
-3. ✅ **Open-source entire platform** — Unlikely for commercial venture
-4. ❌ **Use as separate service** — **Risky**, legal uncertainty remains
-
-### Recommendation
-❌ **DO NOT USE TREK or Mobilizon** in momap without written commercial license from maintainers. Risk > benefit for bootstrapped startup. Build custom event management instead (estimated 2-3 weeks development).
+> Corrections from the previous draft: (1) The text quoted as "AGPL Section 13" was not Section 13. It has been removed and not replaced with a paraphrase, because the clause no longer matters to the design. (2) The case-law claims ("Red Hat vs. Artifex (pending)", "most courts lean restrictive") had no source and have been removed. (3) The claim that PostGIS needs a legal opinion "before production commitment" is overstated (§2). (4) The claim that Directus's MSCL carries a "$5M" threshold is wrong: the threshold is in the separate grant (§6). (5) "Strapi = MIT" was incomplete (§5). (6) The unsourced legal and audit cost figures have been removed.
 
 ---
 
-## 2. GPL v2 License: PostGIS Embedding Risk
-
-### License Terms
-GPL v2 distinguishes between:
-- **"Linking"** — Functional dependency (triggers GPL obligations)
-- **"Mere aggregation"** — Using separate program via API (no GPL obligation)
-
-### What This Means
-
-**Scenario A: PostGIS as External Database Service**
-- Your NestJS app calls PostGIS queries over TCP socket
-- PostGIS binary runs in separate Docker container
-- PostGIS code NOT embedded in your application binary
-- **Assessment:** Likely compliant as "mere aggregation"
-
-**Scenario B: PostGIS Code Linked into Binary**
-- You include PostGIS C libraries in your application build
-- Proprietary code depends on PostGIS internal APIs
-- **Assessment:** Derivative work, triggers GPL v2 obligations
-
-**Scenario C: Modified PostGIS**
-- You fork and modify PostGIS
-- You distribute modified version
-- **Assessment:** DEFINITELY triggers GPL v2 copyleft
-
-### Legal Uncertainty
-
-**The "Linking" Question:**
-- How deep can SQL integration go before it constitutes "linking"?
-- Is a microservices architecture via HTTP different from local API?
-- Jurisdiction interpretation varies (US courts less strict than EU)
-
-### Compliance Paths
-
-1. ✅ **Unmodified external database** (RECOMMENDED)
-   - Run PostGIS in separate container
-   - Access via standard SQL (psql client)
-   - Treat as third-party database service
-   - **Likely GPL-compliant**
-
-2. ⚠️ **Legal opinion required**
-   - Architect design for legal counsel review
-   - Cost: €1-3K for qualified opinion
-   - **Must do before production commitment**
-
-3. ❌ **Avoid modifying PostGIS**
-   - If you need spatial features beyond PostGIS, implement in NestJS layer
-   - Do not fork/patch PostGIS itself
-
-4. ❌ **Avoid direct C linking**
-   - Use PostGIS only via SQL/libpq client
-   - Never embed PostGIS libraries
-
-### Recommendation
-✅ **USE PostGIS as external database service.** Obtain legal opinion on GPL v2 "linking vs. aggregation" interpretation for your specific deployment model (Docker container architecture, SQL-only access, no modifications). Cost: €1-3K, worth the certainty.
-
----
-
-## 3. MPL 2.0 License: File-Level Copyleft (Tokoro)
-
-### License Terms
-MPL 2.0 is file-level copyleft:
-- Only modified files must be open-sourced
-- Unmodified proprietary code coexists legally
-- No derivative work infection
-
-### What This Means
-
-**You use Tokoro unmodified:**
-- ✅ **Fully compliant**, no disclosure required
-- Can integrate into proprietary platform
-- No license restrictions on your code
-
-**You modify Tokoro:**
-- Must open-source only the modified files
-- Provide explicit change notice
-- Include patent grants for modified code
-
-**You create derivative works from Tokoro:**
-- Must include MPL 2.0 license notices
-- Modifications must remain MPL 2.0
-- Non-modified proprietary code remains proprietary
-
-### For Momap Platform
-
-**If using Tokoro event extraction as-is:**
-- ✅ **Compliant**
-- No restrictions on proprietary platform
-- Only requirement: include Tokoro license in attribution
-
-**If modifying Tokoro event extraction:**
-- Must document modifications
-- Must open-source modified Tokoro files
-- Proprietary platform remains proprietary
-
-### Recommendation
-✅ **IF you use Tokoro, MPL 2.0 is manageable.** Recommend using Tokoro event extraction patterns without code reuse (study, then build custom). If you do reuse Tokoro code, use unmodified (don't fork) to simplify licensing.
-
----
-
-## 4. MIT & BSD-2-Clause Licenses: Fully Permissive
-
-### License Terms
-- ✅ Commercial use allowed
-- ✅ Proprietary derivative works allowed
-- ✅ Modification allowed
-- Only requirement: Retain copyright notice
-
-### Applies To
-- Strapi (MIT)
-- Leaflet (BSD-2-Clause)
-- TRIP (MIT)
-- Angular (MIT)
-- TypeScript (MIT)
-- NestJS (MIT)
-
-### For Momap Platform
-
-**✅ FULLY COMPLIANT:**
-- Build proprietary platform using MIT/BSD components
-- No open-source obligations
-- Only requirement: copyright notices in dependencies list
-
-### Recommendation
-✅ **Use MIT/BSD-2-Clause stack as foundation.** No legal ambiguity.
-
----
-
-## 5. ODbL 1.0 License (OpenStreetMap Data)
-
-### License Terms
-**For map data, not software:**
-- ✅ Commercial use allowed
-- ✅ Modification allowed
-- ⚠️ Share-alike: If you publish modified data, must use ODbL
-- ✅ Attribution required (but specific format flexible)
-
-### What This Means
-
-**Using OSM base map:**
-- Must display "© OpenStreetMap contributors" on map
-- Link to https://www.openstreetmap.org/copyright acceptable
-- Can show attribution in corner, info box, or footer
-- Format flexible, placement flexible
-
-**Using OSM POI data (restaurants, attractions):**
-- Same attribution requirements
-- If you modify/augment OSM data and publish: must share-alike
-
-**Combining OSM with other data:**
-- Share-alike applies only to geographic data layer
-- Proprietary code remains proprietary
-- Attribution must distinguish sources
-
-### For Momap Platform
-
-**✅ COMPLIANT:**
-- Use OSM for base map layer
-- Display attribution (required)
-- Use self-hosted TileServer GL (avoids dependence on public OSM servers)
-- Attribute data sources (OSM, Wikidata, kulturinfo) separately
-
-### Recommendation
-✅ **USE OpenStreetMap.** Ensure attribution display is implemented and tested before launch. Non-compliance is automatic license violation.
-
----
-
-## 6. CC0 & CC-BY Licenses (Wikidata, kulturinfo)
-
-### License Terms
-
-**CC0 (Creative Commons Zero):**
-- ✅ No restrictions, public domain
-- No attribution required (though appreciated)
-- Full commercial use allowed
-
-**CC-BY (Creative Commons Attribution):**
-- ✅ Commercial use allowed
-- ⚠️ Attribution required (can be simple text)
-- Must specify which work requires which attribution
-
-### For Momap Platform
-
-**✅ COMPLIANT:**
-- Use Wikidata freely without restrictions
-- Use kulturinfo data with attribution
-- Display attribution near content (e.g., "Based on kulturinfo.hu, licensed CC-BY")
-
-### Recommendation
-✅ **USE Wikidata & kulturinfo.** Implement data source tracking system (database column: source_url, source_license, attribution_required) so you can auto-generate attribution display.
-
----
-
-## 7. Directus MSCL License: Commercial Revenue Threshold
-
-### License Terms
-- ✅ Free for organizations <$5M annual revenue
-- ✅ Can self-host for free if under threshold
-- ⚠️ Organizations >$5M revenue must purchase commercial license
-- "Monetary gains" broadly defined (includes indirect revenue)
-
-### What This Means
-
-**Under $5M revenue:**
-- ✅ Fully free to use, including self-hosted
-- Can monetize platform without license cost
-- No restrictions
-
-**Over $5M revenue:**
-- ❌ Must purchase commercial license
-- Cost: €5-15K/year (varies by deployment scale)
-- License retroactively required if threshold crossed
-
-**Ambiguities:**
-- "Organization" includes parent companies, affiliates
-- "Monetary gains" can include cost savings, not just direct revenue
-- No clear threshold for SaaS multi-tenant deployment
-
-### For Momap Platform
-
-**If bootstrapped startup (under $5M):**
-- ✅ Directus self-hosted is free
-- But: What happens if successful and cross $5M?
-- Retroactive licensing requirement risky
-
-**If growth is goal:**
-- ⚠️ Risky to adopt Directus
-- Better to use Strapi (MIT) from day one
-- Eliminates licensing ambiguity
-
-### Recommendation
-❌ **AVOID Directus for self-hosted.** Use Strapi (MIT community edition) instead. Strapi eliminates revenue-threshold licensing uncertainty. If later you want database abstraction, use TypeORM directly instead of Directus wrapper.
-
----
-
-## 8. Compliance Checklist Before Launch
-
-### LEGAL REQUIREMENTS
-
-- [ ] **Licensing review:** Stakeholders confirm recommended MIT/BSD stack acceptable
-- [ ] **AGPL rejection:** Confirm TREK/Mobilizon network copyleft unacceptable; approve custom event management instead
-- [ ] **PostGIS interpretation:** Obtain legal counsel opinion on GPL v2 "linking vs. aggregation" for your deployment model
-- [ ] **Terms of Service:** Draft ToS including:
-  - Data sources and attributions (OSM, Wikidata, kulturinfo)
-  - User data practices (GDPR)
-  - Limitation of liability for third-party content
-  - Dispute resolution jurisdiction
-- [ ] **Privacy Policy:** Document location data handling, GDPR rights, retention policies
-- [ ] **Data Processing Agreement (DPA):** For each external data source, formalize terms
-- [ ] **Copyright/IP:** Clarify ownership of user-submitted content, business entities, sponsored listings
-
-### IMPLEMENTATION REQUIREMENTS
-
-- [ ] **Attribution system:** Database field for source_url, source_license, attribution_required
-- [ ] **Attribution display:** Tested on map, in POI details, in content footer
-- [ ] **License compliance report:** Auto-generated report listing all dependencies, licenses, compliance status
-- [ ] **GDPR implementation:** User export, erasure, data access endpoints
-- [ ] **Audit logging:** All data access and modifications logged with timestamp/user/action
-- [ ] **Change notices:** If modifying any open-source code, document changes and maintain source availability
-
-### PRE-LAUNCH APPROVALS
-
-- [ ] **Legal counsel:** Final review of ToS, privacy policy, compliance approach (cost: €2-5K)
-- [ ] **DPO (if required):** GDPR compliance verification
-- [ ] **Security audit:** External penetration testing (cost: €3-8K)
-- [ ] **CEO/founder:** Approval of licensing model and compliance costs
-
----
-
-## Risk Matrix: License Compliance
+## 1. AGPL-3.0 (TREK, Mobilizon)
+
+- **VERIFIED:** both repos ship the full AGPL-3.0 text (`LICENSE`, revisions in `01`).
+- AGPL adds a network-use condition: if you *modify* AGPL software and let users interact with it over a network, you must offer those users the corresponding source (FSF GPL FAQ #UnreleasedModsAGPL). **VERIFIED** (FSF FAQ).
+- Under the approved policy, no AGPL code is copied or run, so these obligations cannot arise. **INFERRED.**
+- **Residual risk:** an AI agent or developer pasting snippets from these repos. **Mitigation:** keep clones out of the repo (already the practice) and note the reference-only rule in the contributor guide and agent instructions. **INFERRED.**
+- TREK also has a trademark policy (`TRADEMARKS.md`). Do not use the "TREK" name or logo. **VERIFIED.**
+
+## 2. GPL-2.0-or-later (PostGIS), re-assessed
+
+**Facts:**
+- PostGIS is licensed "under the conditions of the GNU General Public License, either version 2 or (at your option) any later version" (`LICENSE.TXT`). **VERIFIED.**
+- The PostGIS project FAQ ("Will the GPL license used by PostGIS force me to release my source code?") says the GPL's share-alike clauses do not apply to ordinary use such as loading data and running queries. Applications may be under any license. Only *distributing a modified PostGIS* creates source obligations, and those cover PostGIS, not the applications on top. **VERIFIED** (official FAQ).
+- FSF GPL FAQ #MereAggregation: "pipes, sockets and command-line arguments are communication mechanisms normally used between two separate programs". Modules in the same executable or shared address space are one program. The FAQ also says the line is ultimately a legal question. **VERIFIED.**
+- FSF GPL FAQ #UnreleasedMods: running a (even modified) GPL program on a web site without distributing it requires no source release. AGPL is the exception. **VERIFIED.**
+- FSF GPL FAQ #GPLInProprietarySystem: GPL software may be distributed alongside proprietary software when they communicate "at arms length". **VERIFIED.**
+
+**Application to this project (INFERRED):**
+- The planned architecture runs NestJS (proprietary) as a separate process. It connects to PostgreSQL+PostGIS over TCP using the PostgreSQL wire protocol and sends SQL text. There is no linking, no shared address space, and no PostGIS code in the app. This is the textbook "separate programs" case.
+- The project runs PostGIS itself on its own VPS (SaaS). It does not *distribute* PostGIS, so even the PostGIS-side source obligation does not arise. If the project ever hands a Docker image containing PostGIS to a third party, the GPL obligations for *PostGIS* (provide source / written offer) apply. Using the upstream `postgis/postgis` image with a pointer to upstream sources would satisfy this simply.
+- Using PostGIS SQL functions (`ST_Intersects`, etc.) in queries does not make the app a derivative work. This matches the PostGIS FAQ position.
+- **Conclusion:** risk is low. Legal review is **advisable** as part of the general pre-launch review (alongside ToS and privacy), but it is **not a gating item** and does not need a dedicated opinion.
+
+**Practical rules (INFERRED):** do not fork or patch PostGIS. Do not write C extensions that link PostGIS internals. Keep the PostgreSQL/PostGIS versions upstream.
+
+## 3. MPL-2.0 (Tokoro)
+
+- **VERIFIED:** `LICENSE` is MPL-2.0, and the `crawler` and `crawler-worker` manifests declare MPL-2.0.
+- MPL-2.0 is file-level copyleft: if you distribute covered files (modified or not), they stay under MPL with source available, and your other files can be under any license. **INFERRED** from the license text (not reproduced here).
+- Under the reference-only policy, no Tokoro file, prompt, or schema is copied. The earlier advice to "reference Tokoro's prompts" has been withdrawn. **INFERRED.**
+
+## 4. Permissive licenses (MIT, BSD)
+
+| Component | License | Tag |
+|---|---|---|
+| Leaflet | BSD-2-Clause | VERIFIED (`LICENSE` at v1.9.4) |
+| leaflet.markercluster | MIT | VERIFIED (npm metadata) |
+| TRIP (reference only) | MIT | VERIFIED |
+| Angular, NestJS, TypeScript | MIT (widely documented) | UNVERIFIED in this pass |
+
+The obligation is to keep copyright and license notices in distributed copies. For a web app, the JS bundles shipped to browsers count as distribution, so generate a third-party notices file at build time (for example with a license-report tool in CI). **INFERRED.**
+
+## 5. Strapi: MIT core plus Enterprise parts
+
+- **VERIFIED** (root `LICENSE`, identical at tag v5.57.0 and HEAD `5ca3fb20`):
+  - Code under any `ee/` directory is under the Strapi Enterprise license (https://strapi.io/enterprise-terms) unless there is a signed agreement or a cloud subscription.
+  - Everything else is MIT Expat **if** (a) you do not access or use `ee/` code **and** (b) "you have no registered account on our cloud offering". Condition (b) is unusual. **Legal review item:** what applies if the developer later registers a Strapi Cloud account?
+- **VERIFIED:** `packages/core/review-workflows/LICENSE` and `packages/core/content-releases/LICENSE` put the **whole package** under the Enterprise License, and `@strapi/strapi` 5.57.0 depends on both. Audit logs, SSO, and seat enforcement live under `packages/core/admin/ee/`.
+- **INFERRED:** a standard install therefore *ships* Enterprise-licensed code, and features are gated by a license key at runtime. The license wording turns on "accessing or using" that code. Using Community features without enabling EE features is very likely what Strapi intends to be free (its pricing page calls Community "free, forever"), but the text is not clean. **Legal review item (low priority).**
+- **VERIFIED** (pricing page): Community does not include Releases, Review Workflows, Content History, Audit Logs, or SSO. Releases and Content History start at Growth ($45/mo, 3 seats). Review Workflows and Audit Logs are Enterprise only.
+- **VERIFIED:** i18n is MIT and part of core.
+
+## 6. Directus v12: MSCL-1.0 and the Innovation Grant
+
+- **VERIFIED** (`license` at v12.5.0, identical at HEAD): Monospace Sustainable Core License 1.0 ("MSCL-1.0-GPL"). It grants use, modification, and redistribution for any "Permitted Purpose", meaning anything except a **Competing Use**: making the software available to others in competition with Monospace's paid offerings of the software itself. You must not circumvent license-key functionality. Each version becomes **GPL-3.0 four years** after release. It is source-available, not OSI open source.
+- **VERIFIED:** the license text contains **no revenue threshold**. The $5M figure comes from the **Open Innovation Grant**: entities under $5M annual revenue **and** under 50 employees get free, full access through a license key. Eligibility is assessed on "legal entities whose representatives log into the Directus Studio". The key has 5 activations bound to `PUBLIC_URL`, is valid 1 year and renewable, has a 30-day grace period, and falls back to Core on expiry.
+- **VERIFIED:** above the thresholds (or with no key), the **Core** tier is free and needs no key, but it is capped at 3 seats, 25 collections, and 5 flows, with no SSO. Custom permission rules are entitlement-gated in code (`api/src/license/entitlements/manager.ts`).
+- **VERIFIED:** ≤ v11 used BSL 1.1 with a $5M "Total Finances" grant (revenue, budget, *or funding*, including affiliates). This is a different and broader test. It matters if an investor round is ever raised while on an old version.
+- **Application (INFERRED):**
+  - Running Directus as the internal editorial back office of our own tourism site is not a Competing Use, because we do not offer a CMS.
+  - A solo developer's entity is far below both thresholds, so the grant should apply. Eligibility is reviewed periodically and the key must be renewed yearly. That is a small operational dependency on the vendor.
+  - If the grant lapsed, Core limits (3 seats, 25 collections) would very likely still fit an editorial-only CMS. Collection count needs checking against the content model in `07`.
+  - **Vendor risk:** the license has changed twice (BSL in 2023, MSCL in 2026). Future versions could change again. Already-released versions keep their license, and each converts to GPL-3.0 after 4 years.
+- **UNVERIFIED:** the full grant usage agreement text (how revenue is counted, affiliates). Whether key revalidation needs outbound network access. The docs imply periodic revalidation but do not state it.
+
+## 7. Data licenses (summary only; detail in `04` / `05`)
+
+| Source | Position | Tag |
+|---|---|---|
+| OpenStreetMap data | ODbL 1.0: attribution "© OpenStreetMap contributors" with a link to /copyright. Share-alike applies to *derivative databases* that are publicly used. Rendered maps (Produced Works) need attribution only | UNVERIFIED in this pass (see `04`) |
+| OSM tile servers | Tile-usage policy is separate from ODbL. The public tile.openstreetmap.org is not for production apps of this kind | UNVERIFIED in this pass (see `04`) |
+| Wikidata | CC0 for structured data. Wikipedia text and Commons media have their own licenses (often CC BY-SA) | UNVERIFIED in this pass |
+| kulturinfo.hu and other HU event sources | The earlier "CC-BY" claim was **not supported by any source**. Treat as unknown until checked (see `05`) | UNVERIFIED |
+| geoBoundaries (seen in TREK) | CC BY 4.0 | VERIFIED (TREK `NOTICE.md`), primary source not checked |
+
+**Correction:** the previous draft listed "Data Processing Agreements" with OSM, Wikidata, and kulturinfo. These are data *sources*, not GDPR processors, so DPAs do not apply to them. DPAs apply to processors such as the hosting provider (see `06`).
+
+Implementation rule (unchanged, INFERRED): store `source`, `source_url`, `license`, `attribution_text`, and `retrieved_at` per imported record, and render attribution from those fields.
+
+## 8. Pre-launch compliance checklist (solo scale)
+
+- [ ] Reference-only rule written into contributor and agent instructions. Third-party clones stay outside the repo.
+- [ ] Third-party notices file generated in CI for frontend bundles and backend images.
+- [ ] Map attribution (OSM, tile provider) visible on every map view.
+- [ ] Per-record source and license fields populated by every importer.
+- [ ] CMS license position recorded: Strapi Community (no EE features enabled), or Directus with the grant key and renewal date tracked.
+- [ ] One combined legal review before public launch: ToS, privacy notice, source terms for imported data, plus a brief check of the PostGIS, Strapi, or Directus conclusions above. Cost not estimated. **UNVERIFIED.**
+
+## Risk matrix (revised)
 
 | Risk | Severity | Likelihood | Mitigation | Status |
-|------|----------|-----------|-----------|--------|
-| AGPL copyleft (TREK/Mobilizon) | CRITICAL | HIGH | Don't use; build custom | ✅ DECIDED |
-| GPL v2 linking (PostGIS) | HIGH | MEDIUM | Use external service; obtain legal opinion | ⚠️ PENDING |
-| OSM attribution failure | HIGH | MEDIUM | Implement auto-attribution system; test before launch | ⚠️ TODO |
-| GDPR erasure not implemented | CRITICAL | HIGH | Code template provided; implement in Week 12 | ⚠️ TODO |
-| Directus commercial threshold | MEDIUM | LOW | Use Strapi instead | ✅ DECIDED |
-| Dependency vulnerabilities | MEDIUM | MEDIUM | npm audit in CI/CD | ⚠️ TODO |
+|---|---|---|---|---|
+| Accidental copy of AGPL/MPL code from reference repos | High | Low | Reference-only rule, clones outside the repo, review diffs | Policy APPROVED |
+| GPL obligations from PostGIS | Low | Very low | Unmodified, separate server, SQL only, no redistribution | INFERRED, review advisable |
+| Strapi EE-licensed code in a default install / cloud-account condition | Low–Medium | Low | Do not enable EE features. Legal check | Open |
+| Directus grant lapse or license change | Medium | Low–Medium | Track key renewal. Stay within Core limits as fallback. Pin versions | Open |
+| Data-source terms (events, POIs) | High | Medium | Per-source review in `05` | Open |
+| Missing map attribution | High | Medium | Attribution component plus a test | TODO |
 
 ---
 
-## Conclusion
+## Verification log (2026-10-11)
 
-**Recommended approach: Use MIT/BSD-2-Clause stack exclusively.**
-
-This eliminates legal ambiguity around copyleft licenses while maintaining excellent technology choices:
-
-- ✅ Strapi (MIT) for editorial CMS
-- ✅ Leaflet (BSD-2) for mapping
-- ✅ Angular (MIT) for frontend
-- ✅ NestJS (MIT) for backend
-- ✅ PostGIS (GPL v2 external service) with legal review
-- ✅ OpenStreetMap (ODbL) with attribution system
-- ✅ Wikidata (CC0) with optional attribution
-
-**Legal investment required:** €3-5K for licensing opinion + €2-5K for pre-launch legal review + €3-8K for security audit = ~€8-18K total.
-
-**No licensing costs:** €0/month (all software free, all data sources free).
-
+- **Checked:** license files of all 8 repos at the revisions listed in `01`. Strapi `LICENSE` and Directus `license` at tags v5.57.0 / v12.5.0 diffed against HEAD (identical). Directus v11.17.4 BSL text. Strapi package-level LICENSE files (review-workflows, content-releases, i18n) and `@strapi/strapi` dependencies. Directus entitlement code. PostGIS `LICENSE.TXT`. PostGIS FAQ. FSF GPL FAQ (#MereAggregation, #UnreleasedMods, #UnreleasedModsAGPL, #GPLInProprietarySystem). Directus pricing, grant docs, and v12 license announcement. Strapi pricing.
+- **Corrections:** see the box under the Executive summary.
+- **UNVERIFIED:** MPL-2.0 and ODbL clause details (not re-read in this pass). Angular/NestJS licenses. The Directus grant usage agreement. Strapi enterprise-terms content. Full transitive dependency license scan (no SBOM tool was run). All data-source terms.
+- **BLOCKED:** a first FSF FAQ fetch returned 429/403. A retry of `gpl-faq.en.html` succeeded.

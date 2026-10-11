@@ -1,391 +1,97 @@
 # Event & POI Data Ingestion Strategy
 
-## Approved Free Data Sources (All Commercial-Use Compliant)
-
-### Primary Sources
-
-| Source | License | Commercial Use | Attribution | Cost |
-|--------|---------|---|---|---|
-| **OpenStreetMap** | ODbL 1.0 | ✅ YES | ✅ Required | FREE |
-| **Wikidata** | CC0 | ✅ YES | ⚠️ Optional | FREE |
-| **kulturinfo.hu** | CC-BY | ✅ YES | ✅ Required | FREE |
-| **Mobilizon Federation** | Varies | ✅ YES | ✅ Required | FREE |
-
-**Total data cost: $0/month**
+> **Status:** PROPOSAL. The user has not approved it. It was revised by the verification pass on 2026-10-11 (see the "Verification log (2026-10-11)" section at the end of this file).
+> **Evidence tags:** VERIFIED, INFERRED, UNVERIFIED, and BLOCKED, as defined in `.claude/CLAUDE.md` §6. Sources are listed in [`_sources-geo.md`](_sources-geo.md).
+> **Binding constraints:** solo developer; a running cost of about €20–50/month; EU hosting; proprietary code; TREK, TRIP, Mobilizon and Tokoro are reference-only; launch in Debrecen / Hajdú-Bihar first, then Budapest.
+> **Method rule:** this pass read only terms, imprints, robots.txt files and documentation. **Nothing was scraped.**
 
 ---
 
-## Data Ingestion Architecture
+## 1. Key finding
 
-### Worker-Based Crawling Pattern
-
-```python
-# tasks.py - Celery job queue
-from celery import shared_task
-import requests
-from app.models import POI, Event
-from datetime import datetime, timedelta
-
-@shared_task
-def crawl_osm_pois():
-    """Fetch restaurants/attractions from OpenStreetMap"""
-    overpass_query = """
-    [bbox:45.74,16.11,48.58,22.90];
-    (
-      node["amenity"~"restaurant|cafe|pub"]["name"]({{bbox}});
-      way["amenity"~"restaurant|cafe|pub"]["name"]({{bbox}});
-    );
-    out center;
-    """
-    
-    response = requests.get('https://overpass-api.de/api/interpreter',
-                           data=overpass_query, timeout=60)
-    
-    for item in response.json()['elements']:
-        poi_data = {
-            'name': item['tags'].get('name'),
-            'category': 'restaurant',
-            'coordinates': (item['center']['lat'], item['center']['lon']),
-            'source_url': f"https://osm.org/{item['type']}/{item['id']}",
-            'source_license': 'ODbL',
-            'attribution_required': True
-        }
-        POI.upsert(poi_data)
-
-@shared_task
-def crawl_wikidata_venues():
-    """Fetch cultural venues from Wikidata"""
-    sparql_query = '''
-    SELECT ?item ?name ?lat ?long {
-      ?item wdt:P31 wd:Q33506 .  -- instance of museum
-      ?item wdt:P131* wd:Q28 .   -- located in Hungary
-      ?item wdt:P625 ?coords .
-      BIND(xsd:decimal(geoutils:latitude(?coords)) as ?lat)
-      BIND(xsd:decimal(geoutils:longitude(?coords)) as ?long)
-      SERVICE wikibase:label { bd:serviceParam wikibase:language "en,hu" }
-    }
-    '''
-    
-    response = requests.get('https://query.wikidata.org/sparql',
-                           params={'query': sparql_query, 'format': 'json'})
-    
-    for result in response.json()['results']['bindings']:
-        poi_data = {
-            'name': result['name']['value'],
-            'category': 'museum',
-            'coordinates': (float(result['lat']['value']), float(result['long']['value'])),
-            'source_url': result['item']['value'],
-            'source_license': 'CC0',
-            'attribution_required': False
-        }
-        POI.upsert(poi_data)
-
-@shared_task
-def crawl_mobilizon_events():
-    """Fetch events from Mobilizon federation via ActivityPub"""
-    # Mobilizon instances expose events via AP collection endpoint
-    instances = ['mobilizon.hu', 'mobilizon.fr']  # Hungarian + European instances
-    
-    for instance in instances:
-        try:
-            response = requests.get(
-                f'https://{instance}/events',
-                headers={'Accept': 'application/activity+json'},
-                timeout=10
-            )
-            
-            if response.status_code == 200:
-                for item in response.json()['orderedItems']:
-                    event_data = {
-                        'title': item.get('name'),
-                        'description': item.get('summary'),
-                        'venue_name': item.get('location', {}).get('name'),
-                        'coordinates': (
-                            item.get('location', {}).get('latitude'),
-                            item.get('location', {}).get('longitude')
-                        ),
-                        'start_time': item.get('startTime'),
-                        'end_time': item.get('endTime'),
-                        'source_url': item.get('url'),
-                        'source_license': 'Varies',
-                        'confidence_score': 0.9
-                    }
-                    Event.upsert(event_data)
-        except requests.RequestException as e:
-            print(f"Failed to fetch from {instance}: {e}")
-
-# Schedule tasks
-from celery.schedules import crontab
-
-app.conf.beat_schedule = {
-    'crawl-osm-pois': {
-        'task': 'tasks.crawl_osm_pois',
-        'schedule': crontab(hour=2, minute=0),  # Daily at 2 AM
-    },
-    'crawl-wikidata': {
-        'task': 'tasks.crawl_wikidata_venues',
-        'schedule': crontab(hour=3, minute=0),  # Daily at 3 AM
-    },
-    'crawl-mobilizon': {
-        'task': 'tasks.crawl_mobilizon_events',
-        'schedule': crontab(hour='*/6'),  # Every 6 hours
-    },
-}
-```
+The earlier draft's heading, "Approved Free Data Sources (All Commercial-Use Compliant)", was **wrong**. Only the **open-data** sources (OSM, Wikidata and Lechner boundaries) have verified reuse licences. **None of the Debrecen, Hajdú-Bihar or national tourism event sites checked publishes an API, a feed or an open licence.** At least one of them, debrecen.hu, explicitly **prohibits** storing or processing its content without written consent. In the MVP, events therefore have to come from **(a) manual editorial entry, (b) organisers submitting their own events, or (c) written data-sharing agreements**, not from automated crawling.
 
 ---
 
-## Deduplication Engine
+## 2. Source assessment: Debrecen and Hajdú-Bihar (priority 1)
 
-### Fuzzy Matching + Spatial Clustering
+| Rank | Source | Operator | Data | API / feed | Terms / licence | robots.txt | Verdict |
+|---|---|---|---|---|---|---|---|
+| 1 | **OpenStreetMap** (Geofabrik extract) | OSMF / contributors | POIs (amenity, tourism, historic…) | Planet and Geofabrik extracts; Overpass API, for which public-instance limits apply | **ODbL 1.0** (VERIFIED). Share-alike risk if merged with proprietary data (see §4) | `www.openstreetmap.org` asks bulk users to use the planet or extracts; Overpass `/api/` is disallowed for crawlers, and API use falls under the Overpass usage guidance | **Use**, for POIs, kept in separate provenance (VERIFIED) |
+| 2 | **Wikidata** | Wikimedia | Museums, monuments, venues, with Q-ids and links | SPARQL (WDQS): 60 s timeout, 5 parallel queries per IP, descriptive User-Agent required; dumps for bulk | Structured data is **CC0** (VERIFIED); linked images on Commons are licensed separately (UNVERIFIED) | `/sparql` disallowed for crawlers; API use under the WDQS user manual | **Use**, for enrichment and cultural POIs (VERIFIED) |
+| 3 | **Lechner INSPIRE administrative units** | Lechner Tudásközpont | County, járás and settlement polygons | ATOM / WFS / SHP download | **CC BY 4.0** per the metadata (VERIFIED) | n/a | **Use**, for boundaries (see 04 §1.2) |
+| 4 | **visitdebrecen.com** (Tourinform Debrecen) | Debrecen tourism agency (INFERRED from the Tourinform contact `debrecen@tourinform.hu`, Piac u. 20; the legal entity name is not shown on the site, so UNVERIFIED) | Tourism news, "Hot now" programmes | **None found** (it is a WordPress site; its REST API was deliberately not probed) | **No reuse terms**, only "© 2026 visitdebrecen". Default copyright applies, so INFERRED: **permission needed** | Only `/wp-admin/` disallowed | **Best partnership target.** Request a feed or written permission |
+| 5 | **debreceniprogramok.com** | Not identified. The site footer says "© Debreceni Programok. Minden jog fenntartva"; the developer is PW Studio, which also built the "Debrecen Events" app linked from visitdebrecen.com | City events calendar. debrecen.hu's "Események a héten" page **302-redirects here** (VERIFIED) | **None found** | "All rights reserved" (VERIFIED) | Only `/ajax/` disallowed | Likely the de facto official calendar (INFERRED). **Permission or agreement needed** |
+| 6 | **debrecen.hu** | Debrecen Megyei Jogú Város Önkormányzata (VERIFIED, impresszum) | Municipal news and links | **None found**; `/robots.txt` and `/rss` both return 404 | Impresszum (VERIFIED): content may be reused **only with a source reference**, and **"Tilos az oldalon szereplő tartalmak elektronikus tárolása, bármilyen formátumban történő feldolgozása"** without prior written consent | No robots.txt (404) | **Do not ingest** without written consent |
+| 7 | **hajduszoboszlo.hu** | Hajdúszoboszlói Turisztikai Közhasznú Nonprofit Kft. (per its privacy policy, VERIFIED) | Events ("Városi rendezvények", `/program/`) | **None found** | No reuse terms published, so default copyright applies (INFERRED) | Only `/wp-admin/` disallowed | Partnership target for phase 1b |
+| 8 | **visithungary.com** | Visit Hungary National Tourism Organisation Ltd. / Hungarian Tourism Agency (VERIFIED, impressum) | National events calendar (`/collection/events`) | A `/publicapi/` path exists but is **disallowed in robots.txt** and undocumented (VERIFIED) | No reuse terms found on the impressum; "© 2012-2026 Hungarian Tourism Agency" | `Disallow: /publicapi/` | **Do not use** the undocumented API. Ask through the B2B channel |
+| 9 | **kozadatportal.hu** (Nemzeti Közadatportál, NAVÜ Kft.) | NAVÜ Kft. (VERIFIED, disclaimer page) | National open-data catalogue (CKAN). A search for "Debrecen" found only **KSH Debrecen weather data, licensed CC Non-Commercial**; "turizmus" found 2 KSH statistical sets | CKAN API exists, **but robots.txt disallows `/api/`** and sets Crawl-Delay 10 | Licence is set per dataset; portal content is NAVÜ IP by default | `Disallow: /api/` | **No relevant event or POI data found** (VERIFIED for these searches) |
+| — | **data.gov.hu** | — | — | — | — | — | **BLOCKED.** The host resolves but refuses connections on 80 and 443. The current national portal appears to be kozadatportal.hu (INFERRED) |
+| — | **kulturinfo.hu** | — | — | — | — | — | **BLOCKED / removed.** HTTPS refused and HTTP returned 403. The earlier claims ("CC-BY", "SPARQL endpoint", "official ministry") are **unsupported** |
+| — | Hortobágyi Nemzeti Park (hnp.hu), Hajdú-Bihar county portal | — | — | — | — | hnp.hu has no robots.txt (serves an HTML page); a county tourism portal was not found | **UNVERIFIED.** Check in a later pass |
 
-```python
-from fuzzywuzzy import fuzz
-import numpy as np
-from sklearn.cluster import DBSCAN
+**Ranking rationale (INFERRED):**
+- Sources 1–3 are usable now under verified licences.
+- Sources 4–5 are the most valuable for *events* in Debrecen, but need a written agreement. visitdebrecen.com comes first because a Tourinform office has a public mission to promote tourism, which makes it the most likely partner.
+- debrecen.hu's terms are the most restrictive found.
 
-def find_duplicates(category: str, threshold: float = 0.85):
-    """Find likely duplicate POIs within category"""
-    pois = POI.query.filter_by(category=category).all()
-    
-    # Fuzzy name matching
-    duplicates = []
-    for i, poi1 in enumerate(pois):
-        for poi2 in pois[i+1:]:
-            # String similarity
-            name_sim = fuzz.ratio(poi1.name.lower(), poi2.name.lower()) / 100
-            
-            # Spatial distance
-            from math import radians, cos, sin, asin, sqrt
-            lat1, lon1 = poi1.coordinates
-            lat2, lon2 = poi2.coordinates
-            
-            # Haversine formula
-            lon1, lat1, lon2, lat2 = map(radians, [lon1, lat1, lon2, lat2])
-            dlon = lon2 - lon1
-            dlat = lat2 - lat1
-            a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
-            c = 2 * asin(sqrt(a))
-            distance_km = 6371 * c
-            
-            # Combined score: high name similarity + close proximity = duplicate
-            if name_sim > threshold and distance_km < 0.5:
-                duplicates.append({
-                    'poi1_id': poi1.id,
-                    'poi2_id': poi2.id,
-                    'name_similarity': name_sim,
-                    'distance_km': distance_km,
-                    'confidence': min(0.99, name_sim * 0.7 + (1 - distance_km/1.0) * 0.3)
-                })
-    
-    return duplicates
+## 3. Budapest sources (priority 2; partially checked)
 
-def merge_duplicate_pois(poi1_id: int, poi2_id: int):
-    """Merge two POIs, keeping highest quality data"""
-    poi1 = POI.query.get(poi1_id)
-    poi2 = POI.query.get(poi2_id)
-    
-    # Keep POI with most recent verification
-    if poi2.updated_at > poi1.updated_at:
-        poi1, poi2 = poi2, poi1
-    
-    # Merge attribution sources
-    for source in poi2.attributions:
-        if source not in poi1.attributions:
-            poi1.attributions.append(source)
-    
-    # Keep highest rating
-    if poi2.rating and poi2.rating > (poi1.rating or 0):
-        poi1.rating = poi2.rating
-    
-    # Mark duplicate for removal
-    poi2.is_duplicate_of = poi1.id
-    db.session.commit()
-```
+| Source | Finding | Tag |
+|---|---|---|
+| **budapestinfo.hu** (official tourism site) | robots.txt allows everything. The page is client-rendered, so WebFetch could not read the operator, terms or calendar | robots VERIFIED; terms **BLOCKED** |
+| **budapest.hu** (Főváros) | robots.txt allows `/`, with one civil-database path disallowed. Terms and APIs not checked | robots VERIFIED; terms UNVERIFIED |
+| opendata.budapest.hu | No DNS record (NXDOMAIN) | VERIFIED (domain does not resolve) |
+| port.hu (commercial listings) | robots.txt blocks `/jegymester/`, `/ticketlist/` and others, and blocks `anthropic-ai`, `GPTBot`, `CCBot` and other AI crawlers entirely; it is a commercial aggregator | VERIFIED. **Do not use** |
+| OSM, Wikidata | Same as for Debrecen | VERIFIED |
+
+## 4. Licence-driven ingestion rules (PROPOSAL)
+
+1. **Keep OSM data separate (VERIFIED basis: OSMF Collective Database Guideline).** Store OSM POIs with `source='osm'` and `source_id` (`node/123`). **Do not merge or de-duplicate them into editor-owned or partner records.** The guideline explicitly says that merging a proprietary list with OSM data and removing duplicates is *not* covered by its safe harbour, so the proprietary data "may be subject to ODbL share-alike". Show OSM and editorial records side by side; a "suppress duplicate in UI" link table is acceptable only if it fits the guideline's reference rules (**legal review**).
+2. **Wikidata (CC0)** may be merged freely. Still keep `source='wikidata'` and the Q-id for provenance.
+3. **Partner and organiser data:** store the agreement reference, licence scope (display, cache, retention), `retrieved_at`, and the moderation status.
+4. **Images:** never copy images from any site, including Commons, without a per-image licence record (CLAUDE.md §7).
+5. **Respect API policies:** use a descriptive User-Agent with a contact address. Use the Geofabrik extract rather than Overpass for bulk loads. Run WDQS queries at most daily and keep them small. Never call APIs disallowed in robots.txt (visithungary `/publicapi/`, kozadatportal `/api/`) without permission.
+
+## 5. Architecture corrections
+
+- **Stack mismatch (VERIFIED from the earlier draft):** the earlier draft used **Python/Celery** code with `fuzzywuzzy` and `sklearn`, while 03 proposes **NestJS/TypeScript**. For a solo developer, run the ingestion jobs **inside the NestJS app**, using a Postgres-backed queue such as `pg-boss` or `@nestjs/schedule` cron jobs, rather than adding Celery and Redis (INFERRED; these libraries were not verified here).
+- **`fuzzywuzzy`** is GPL-2.0 licensed. That licence is INFERRED from general knowledge and was not verified in this pass, so check it before any use. The Python sample has been removed in any case.
+- **Mobilizon ingestion removed.** The instance `mobilizon.hu` **does not resolve** (VERIFIED: NXDOMAIN). The `GET /events` ActivityPub endpoint and "orderedItems" response were never verified. Running or depending on Mobilizon conflicts with the reference-only decision unless the user explicitly approves consuming third-party instance feeds.
+- **De-duplication (INFERRED design):** use PostGIS `ST_DWithin` (for example, 50–100 m) combined with trigram name similarity (`pg_trgm`), *within* the same source family. Across OSM and non-OSM data, apply rule 1 in §4. The earlier pure-Python O(n²) loop has been removed.
+- **Staleness (INFERRED):** events whose `end_time` has passed should become non-visible at once, not after 30 days. An HTTP 404 from the source does **not** mean an event was cancelled. Flag such events for moderation instead.
+
+## 6. GDPR items (move to 06-security-and-operations when it is written)
+
+Corrections to the earlier draft (INFERRED from GDPR principles, not legal advice):
+- "Audit logs older than 3 years (GDPR minimum retention)" is **wrong**. GDPR sets no minimum retention period; it requires storage limitation, so retention periods must be justified and documented. Pick the periods with legal input.
+- Logging every `poi_view` with a `user_id`, IP address and user agent conflicts with data minimisation. Use aggregate, anonymous counters instead.
+- The earlier code labelled a TypeScript controller as `python` and erased accounts on a `DELETE` request reached through an emailed link. Those details belong to implementation design in 06, and the sample has been removed.
+
+## 7. Effort and cost (PROPOSAL)
+
+- **Data licence cost:** €0 for OSM, Wikidata and Lechner INSPIRE (VERIFIED licences). Partner agreements cost an unknown amount (UNVERIFIED).
+- **Effort (relative):** OSM + Wikidata import is **low–medium**; the editorial and organiser submission flow with moderation is **medium**; partner feeds are **medium per partner**, plus non-technical negotiation.
+- The earlier figures ("3-4 weeks", "~4 hours/month", "€0/month operational") were unsourced and have been withdrawn.
 
 ---
 
-## Event Lifecycle Management
+## Verification log (2026-10-11)
 
-### Automatic Staleness Detection
+**Method:** read robots.txt files with curl, using a descriptive User-Agent. Read home, imprint and terms pages through WebFetch. Ran 2 Wikidata `wbgetentities`/`wbsearchentities` API lookups to verify Q-ids. Made **3 CKAN `package_search` calls to kozadatportal.hu before reading its robots.txt, which disallows `/api/`.** The calls were made in error, and no further API calls followed; the website search page was used afterwards. No crawling or bulk download of event or POI content took place.
 
-```python
-@shared_task
-def validate_events():
-    """Check events for cancellation/expiration"""
-    from datetime import datetime, timedelta
-    
-    # Events ending more than 30 days ago
-    old_events = Event.query.filter(
-        Event.end_time < datetime.now() - timedelta(days=30)
-    ).all()
-    
-    for event in old_events:
-        event.marked_as_stale = True
-        
-        # Try to verify if still active
-        response = requests.head(event.source_url, timeout=5)
-        if response.status_code == 404:
-            event.canceled = True  # Source no longer available
-    
-    db.session.commit()
-```
+| # | Earlier claim | Result |
+|---|---|---|
+| 1 | "All commercial-use compliant" free sources | **Wrong.** Only OSM, Wikidata and Lechner have verified open licences; the tourism sites are all-rights-reserved or have no terms |
+| 2 | kulturinfo.hu: CC-BY with an API | **Unsupported.** The site is unreachable (BLOCKED) |
+| 3 | Mobilizon federation, `mobilizon.hu`, licence "Varies", "commercial YES" | **Wrong.** The domain doesn't exist and the endpoint is unverified; removed |
+| 4 | Wikidata attribution "optional" | **Confirmed.** CC0 structured data (VERIFIED) |
+| 5 | OSM "commercial use YES, attribution" with no share-alike caveat | **Incomplete.** Added the Collective Database Guideline restriction on merging and de-duplication (VERIFIED) |
+| 6 | Python/Celery workers | **Inconsistent** with the proposed NestJS stack; replaced with an in-app job runner proposal (INFERRED) |
+| 7 | Overpass full-Hungary bbox query run daily | **Discouraged.** Overpass guidance points heavy and app users to their own instance or extracts (VERIFIED); use Geofabrik |
+| 8 | WDQS `?item wdt:P131* wd:Q28` over all of Hungary | Can exceed the 60 s timeout (INFERRED); split the query by county |
+| 9 | GDPR "3-year minimum retention" | **Wrong** (INFERRED, GDPR text not re-read in this pass) |
+| 10 | Effort and cost figures | **Unsourced, withdrawn** |
 
----
-
-## GDPR Compliance Implementation
-
-### User Data Export Endpoint
-
-```python
-# backend/modules/gdpr/gdpr.controller.ts
-@Post('/gdpr/export')
-async exportUserData(@Req() req, @Res() res) {
-    const user = req.user;
-    
-    // Collect all user data
-    const userData = {
-        profile: await this.userService.get(user.id),
-        favorites: await this.favoriteService.find({user_id: user.id}),
-        flags: await this.flagService.find({user_id: user.id}),
-        audit_log: await this.auditLogService.find({user_id: user.id}),
-    };
-    
-    // Return as downloadable JSON
-    res.set('Content-Type', 'application/json');
-    res.set('Content-Disposition', 'attachment; filename="momap_export.json"');
-    res.send(JSON.stringify(userData, null, 2));
-}
-
-@Delete('/gdpr/erasure/request')
-async requestErasure(@Req() req) {
-    const user = req.user;
-    
-    // Create erasure request (requires confirmation via email)
-    const token = crypto.randomBytes(32).toString('hex');
-    await this.erasureService.create({
-        user_id: user.id,
-        token,
-        requested_at: new Date(),
-        status: 'pending'
-    });
-    
-    // Send confirmation email
-    await this.emailService.sendErasureConfirmation(user.email, token);
-    
-    return {message: 'Confirmation email sent. Click link to complete erasure.'};
-}
-
-@Delete('/gdpr/erasure/:token')
-async confirmErasure(@Param('token') token) {
-    const request = await this.erasureService.findByToken(token);
-    
-    if (!request || request.status !== 'pending') {
-        throw new BadRequestException('Invalid or expired token');
-    }
-    
-    // Delete all user data
-    await this.userService.delete(request.user_id);
-    
-    request.status = 'completed';
-    request.completed_at = new Date();
-    await request.save();
-    
-    return {message: 'Your account and all data have been deleted.'};
-}
-```
-
-### Audit Logging for Compliance
-
-```sql
-CREATE TABLE audit_log (
-    id SERIAL PRIMARY KEY,
-    user_id INTEGER,
-    action VARCHAR(100),  -- 'export_request', 'erasure_request', 'poi_view', etc
-    entity_type VARCHAR(50),
-    entity_id INTEGER,
-    changes JSONB,
-    ip_address INET,
-    user_agent TEXT,
-    timestamp TIMESTAMP DEFAULT NOW(),
-    FOREIGN KEY(user_id) REFERENCES users(id)
-);
-
--- Log all POI views (for analytics without personal tracking)
-INSERT INTO audit_log (user_id, action, entity_type, entity_id, timestamp)
-VALUES ($1, 'poi_view', 'poi', $2, NOW());
-
--- Log all data exports (for GDPR compliance)
-INSERT INTO audit_log (user_id, action, entity_type, timestamp)
-VALUES ($1, 'data_export', 'user', NOW());
-```
-
----
-
-## Data Freshness Monitoring
-
-```python
-@shared_task
-def monitor_data_freshness():
-    """Report on freshness of data sources"""
-    from datetime import datetime, timedelta
-    
-    report = {
-        'osm_pois': {
-            'last_updated': POI.query.filter_by(source_license='ODbL').order_by(
-                POI.updated_at.desc()).first().updated_at,
-            'count': POI.query.filter_by(source_license='ODbL').count(),
-            'age_days': (datetime.now() - last_updated).days
-        },
-        'events': {
-            'upcoming': Event.query.filter(Event.start_time > datetime.now()).count(),
-            'last_check': Event.query.order_by(Event.updated_at.desc()).first().updated_at,
-        }
-    }
-    
-    # Alert if no updates in 7 days
-    for source, data in report.items():
-        if data['age_days'] > 7:
-            alert(f"Warning: {source} has not been updated in {data['age_days']} days")
-    
-    return report
-```
-
----
-
-## Data Retention & Removal Policy
-
-```sql
--- Events older than 1 year from end date are marked stale
-DELETE FROM events
-WHERE end_time < NOW() - INTERVAL '1 year'
-  AND canceled = false;
-
--- Old POI versions (keep 3 most recent)
-DELETE FROM poi_versions
-WHERE poi_id = $1
-  AND version < (
-    SELECT MAX(version) FROM poi_versions WHERE poi_id = $1
-  ) - 3;
-
--- Audit logs older than 3 years (GDPR minimum retention)
-DELETE FROM audit_log
-WHERE timestamp < NOW() - INTERVAL '3 years';
-```
-
----
-
-## Summary
-
-**Zero-cost data ingestion pipeline:**
-- Free approved sources (OSM, Wikidata, kulturinfo.hu, Mobilizon)
-- Automated daily crawlers (Python/Celery)
-- Deduplication engine (fuzzy matching + spatial)
-- GDPR-compliant erasure system
-- Audit logging for compliance
-- Event lifecycle management (staleness, cancellation)
-
-**Operational cost:** €0/month (all sources free)  
-**Development effort:** 3-4 weeks for full implementation  
-**Maintenance burden:** ~4 hours/month for crawler monitoring
-
+**BLOCKED:** data.gov.hu (connection refused), kulturinfo.hu (refused / 403), budapestinfo.hu terms (client-rendered), visitdebrecen.hu (connection refused; the working site is visitdebrecen.com).
+**UNVERIFIED:** the legal entity behind visitdebrecen.com and debreceniprogramok.com; the Hortobágy NP and county portal terms; budapest.hu terms; Commons image licences; the `pg-boss` and `pg_trgm` licences; the `fuzzywuzzy` licence.

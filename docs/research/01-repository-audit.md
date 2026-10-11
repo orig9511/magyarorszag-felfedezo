@@ -1,379 +1,198 @@
 # Repository Audit Report
 
+**Status:** Audit draft, revised 2026-10-11 by a verification pass. Nothing here is an approved decision unless it is marked **APPROVED** (user decision, 2026-10-11).
+**Evidence tags:** **VERIFIED** (checked directly in a license file, manifest, source, API, or official doc), **INFERRED** (reasoned from evidence), **UNVERIFIED** (not adequately checked), **BLOCKED** (could not be checked).
+**Sources:** see `_sources-licensing.md`. Revisions inspected are listed in the verification log at the end of this file.
+
 ## Overview
-Evidence-based assessment of 8 candidate repositories for reusability, licensing, and technical fit. All findings verified through primary source inspection.
+
+This file assesses the 9 candidates from CLAUDE.md §5 (Mobilizon's docs site counts with Mobilizon, which leaves 8 repositories). The approved MVP decisions (2026-10-11) shape every conclusion here:
+
+- **APPROVED:** TREK, TRIP, Mobilizon, and Tokoro are **reference-only**. That means no code copying and no running them as services. The only real third-party runtime dependencies are **Leaflet, PostGIS, and one CMS**.
+- **APPROVED:** Platform code is **proprietary / closed-source**.
+- **APPROVED:** **Solo developer** (user plus AI agents) with a **EUR 20–50/month EU VPS** budget.
+
+So for the four reference projects, license risk now matters only if someone copies code by mistake. Because the policy is to study ideas, not code, their licenses no longer block anything. **INFERRED.**
+
+> Correction from the previous draft: it stated "All findings verified" with "no access failures". That was not supported. Several claims (stars, commit counts, feature lists) were unsourced, and some were wrong. See the verification log.
 
 ---
 
-## 1. TREK: Collaborative Travel Planner
+## 1. TREK (collaborative travel planner): reference only
 
-**Repository:** https://github.com/liketrek/TREK  
-**Latest Commit:** October 11, 2026, 00:42 UTC  
-**Latest Release:** v4.3.3 (September 26, 2026)  
-**Status:** ACTIVELY MAINTAINED  
+| Item | Finding | Tag |
+|---|---|---|
+| URL / identity | https://github.com/liketrek/TREK. Not a fork, not archived, created 2026-03-19 | VERIFIED (GitHub API) |
+| License | **AGPL-3.0**, full text in `LICENSE` at `1c05ee4b` | VERIFIED |
+| Trademark | `TRADEMARKS.md` restricts use of the "TREK" name separately from the AGPL | VERIFIED |
+| Latest release | v4.3.3, 2026-09-26 | VERIFIED |
+| Last activity | Default-branch HEAD commit 2026-09-26. Repo `pushed_at` 2026-10-11T00:42Z (may be another branch) | VERIFIED |
+| Popularity | 14,702 stars | VERIFIED (API, 2026-10-11) |
+| Stack | Server: NestJS 11, Express 4, better-sqlite3 (`server/package.json`). Client: React 19, Leaflet ^1.9.4, maplibre-gl, **mapbox-gl ^3** (`client/package.json`) | VERIFIED |
+| Bundled data | geoBoundaries admin boundaries (CC BY 4.0), OSM/Nominatim/Overpass, Wikimedia Commons (`NOTICE.md`) | VERIFIED |
+| Features (real-time sync, budgeting, offline, plugins) | Listed in the earlier draft, not checked in this pass | UNVERIFIED |
 
-### License: GNU Affero General Public License v3.0
-- **Type:** Strong network copyleft
-- **Network Clause (Section 13):** If deployed as network service, users must be offered source download
-- **Implication:** If integrated into proprietary platform and accessed over network, entire codebase must be open-sourced
-- **Risk Level:** **UNACCEPTABLE for commercial platform**
+**Notes:**
+- `mapbox-gl` v2+ is not OSI-licensed: npm shows "SEE LICENSE IN LICENSE.txt" (**VERIFIED**). That is one more reason not to copy TREK's map layer. **INFERRED.**
+- `NOTICE.md` is a good model for how to present data attribution (geoBoundaries, OSM, Commons author/licence display). Study the *practice*, not the files. **INFERRED.**
 
-### Technology Stack
-- **Frontend:** React 19.2.6, Vite, Tailwind CSS, Zustand, Leaflet/Mapbox GL
-- **Backend:** NestJS 11, Express, SQLite with better-sqlite3
-- **Runtime:** Node.js 22, TypeScript
-- **Storage:** Filesystem/S3 abstraction, IndexedDB offline
-- **Key Features:** WebSocket real-time sync, multi-currency budgeting, route optimization (OSRM), PWA support
-
-### Reusable Components
-✅ **Geographic services layer** — Place enrichment, route optimization, map caching  
-✅ **Real-time collaboration engine** — WebSocket sync, permission system, idempotency  
-✅ **Financial tracking** — Multi-currency budgeting, expense splitting  
-✅ **Offline-first architecture** — IndexedDB + mutation queueing  
-✅ **Plugin architecture** — Sandboxed extensions with permission gating  
-
-### Assessment
-**Strengths:**
-- Production-grade (14.7k stars, active maintenance)
-- Proven real-time collaboration patterns
-- Comprehensive trip/itinerary data models
-- Multi-language support
-
-**Why Not to Use:**
-- AGPL v3 copyleft incompatible with proprietary tourism platform
-- No easy commercial licensing path documented
-- SQLite database (not suitable for multi-tenant SaaS)
-- Entire codebase focused on trip planning (not events/discovery)
-
-**Recommendation:** ❌ **AVOID for direct reuse.** Study design patterns only. Consider event management as custom build to avoid licensing risk.
+**Recommendation:** Reference only (**APPROVED** policy). Study its UX and its attribution practice. Do not copy code, assets, or bundled GeoJSON.
 
 ---
 
-## 2. TRIP: Minimalist POI Map Tracker
+## 2. TRIP (minimalist POI map tracker): reference only
 
-**Repository:** https://github.com/itskovacs/TRIP  
-**Stars:** 1,949 | Forks:** 119  
-**Latest Release:** v1.50.1 (October 2, 2026)  
-**Status:** ACTIVELY MAINTAINED  
+| Item | Finding | Tag |
+|---|---|---|
+| URL / identity | https://github.com/itskovacs/TRIP. Canonical name `itskovacs/trip` (case only). Not a fork | VERIFIED |
+| License | **MIT**, `license.txt`, "Copyright (c) 2026 Kovacs", at `856b1edf` | VERIFIED |
+| Latest release / activity | 1.50.1, 2026-10-02. HEAD commit 2026-10-02 | VERIFIED |
+| Popularity | 1,949 stars | VERIFIED (API) |
+| Frontend | Angular ^21.1.1, PrimeNG ^21.0.4, Leaflet ^1.9.4, leaflet.markercluster ^1.5.3, Transloco (i18n) | VERIFIED (`src/package.json`) |
+| Backend | FastAPI ~0.141, SQLModel ~0.0.47, Alembic, SQLite | VERIFIED (`backend/trip/requirements.txt`, `alembic.ini`) |
+| Fork count (119) | Not rechecked | UNVERIFIED |
 
-### License: MIT (Standard Open Source)
-- **Type:** Permissive, commercial use allowed
-- **Restrictions:** Only require copyright notice retention
-- **Risk Level:** ✅ **ACCEPTABLE**
+**Notes:** TRIP is the closest stack match for the *frontend* (Angular + Leaflet + markercluster + Transloco), so it is the most useful reference for structure. MIT would technically allow reuse with a notice, but the **APPROVED** policy is reference-only, so nothing is copied. **INFERRED.**
 
-### Technology Stack
-- **Frontend:** Angular 21.1.1, PrimeNG v21.0.4, Leaflet v1.9.4, Tailwind CSS
-- **Backend:** FastAPI (Python 3.12), SQLModel ORM, SQLite
-- **Database:** Alembic migrations
-- **Key Features:** Multi-day itineraries, POI categorization, booking management, checklist/packing lists
-
-### Reusable Components
-✅ **Data models** — Trip, Day, Place, Booking, Category structures  
-✅ **Angular integration patterns** — Frontend structure with PrimeNG components  
-✅ **API design** — RESTful endpoints for trips, places, bookings  
-✅ **Multi-user features** — Sharing configurations  
-
-### Assessment
-**Strengths:**
-- MIT license fully commercial-compatible
-- Clean separation: Angular frontend + FastAPI backend
-- Proven itinerary/booking data model
-- Active maintenance (recent version Oct 2, 2026)
-
-**Limitations:**
-- FastAPI backend (Python) conflicts with recommended NestJS/TypeScript backend
-- SQLite database (not for multi-tenant)
-- Limited geographic query sophistication
-- No real-time features
-- Architecture mismatch with recommended NestJS stack
-
-**Recommendation:** 📚 **STUDY for data model patterns.** Recommend implementing custom NestJS-based trip/event management to maintain consistency with recommended stack rather than porting FastAPI code.
+**Recommendation:** Reference only. Study the Angular–Leaflet integration and the marker-clustering setup.
 
 ---
 
-## 3. Mobilizon: Federated Event Management
+## 3. Mobilizon (federated events): reference only
 
-**Repository:** https://framagit.org/kaihuri/mobilizon (now maintained by Kaihuri association)  
-**Latest Release:** v4.1.0 (February 29, 2024)  
-**Commits:** 6,986 | Releases:** 92  
-**Status:** ACTIVELY MAINTAINED (post-Framasoft)  
+| Item | Finding | Tag |
+|---|---|---|
+| URL / identity | https://framagit.org/kaihuri/mobilizon. GitLab project id 20125, created 2017-12-08, not a fork. That is the original Framasoft project, now under the `kaihuri` namespace | VERIFIED (GitLab API) |
+| Old URL | `framagit.org/framasoft/mobilizon` returns 302 to sign-in for anonymous requests, so the redirect cannot be confirmed | BLOCKED |
+| Git redirect | `git clone` reported `redirecting to .../kaihuri/mobilizon.git/` (only adds the `.git` suffix) | VERIFIED |
+| License | **AGPL-3.0**, `LICENSE` at `f2590486` | VERIFIED |
+| Latest release | **5.2.4 (2026-07-01)**. 5.2.5-RC.1 (2026-10-01). Last activity 2026-10-11 | VERIFIED |
+| Stack | Elixir ~> 1.17, Phoenix ~> 1.8, LiveView, `geo_postgis` (PostgreSQL+PostGIS), Vue ^3.5.39 | VERIFIED (`mix.exs`, `package.json`) |
+| Docs site | https://docs.mobilizon.org/, not opened in this pass | UNVERIFIED |
+| GDPR-by-design / moderation features | Not checked | UNVERIFIED |
 
-### License: GNU Affero General Public License v3.0
-- **Type:** Strong network copyleft
-- **Network Clause:** Users must be offered source access
-- **Implication:** Same AGPL risk as TREK
-- **Risk Level:** **UNACCEPTABLE for proprietary commercial platform**
+> Correction: the previous draft gave "v4.1.0 (February 29, 2024)" as the latest release. That is stale. The latest stable release is 5.2.4. The "6,986 commits / 92 releases" figures were not reproduced, so they have been removed.
 
-### Technology Stack
-- **Backend:** Elixir (1.17+) + Phoenix (1.8) + LiveView
-- **Frontend:** Vue.js 3.5.39, Vite
-- **Database:** PostgreSQL + PostGIS
-- **API:** GraphQL + ActivityPub federation
-- **Key Features:** Event discovery, RSVP, moderation, federation with Mastodon/PeerTube, multi-language support
-
-### Reusable Components
-✅ **Event data model** — Events, participants, RSVP statuses  
-✅ **Moderation system** — User suspension, content reporting, spam checks  
-✅ **Federation protocol** — ActivityPub implementation for decentralized events  
-✅ **Admin workflows** — Permissions, roles, analytics  
-
-### Assessment
-**Strengths:**
-- Production-ready (4+ years active)
-- Excellent event management features
-- Federation enables decentralized event sharing
-- GDPR-compliant by design (Framasoft heritage)
-- PostgreSQL + PostGIS (matches recommended stack)
-
-**Why Not to Use:**
-- AGPL v3 copyleft creates same unacceptable legal risk as TREK
-- Elixir/Phoenix backend (conflicts with NestJS recommendation)
-- Architecture designed for social federation, not curated tourism discovery
-- Integration effort high due to technology mismatch
-
-**Recommendation:** ❌ **AVOID for direct reuse.** Event federation via Mobilizon's ActivityPub protocol could be leveraged through API integration only (keeping Mobilizon as external service) if AGPL risk is acceptable to legal team. Otherwise, build custom event management in-house.
+**Recommendation:** Reference only. The event data model (statuses, participation, moderation reports) is worth studying. Running it as a service is excluded by the **APPROVED** policy, so the earlier "API integration if legal team accepts AGPL" path is withdrawn.
 
 ---
 
-## 4. Tokoro: Serverless Event Aggregation
+## 4. Tokoro (event extraction / aggregation): reference only
 
-**Repository:** https://github.com/robertoranon/tokoro  
-**Stars:** 7 | Forks:** 0  
-**Latest Activity:** October 7, 2026  
-**Commits:** 335+  
-**Status:** ACTIVE (early-stage solo development)  
+| Item | Finding | Tag |
+|---|---|---|
+| URL / identity | https://github.com/robertoranon/tokoro. Not a fork, created 2026-04-10 | VERIFIED |
+| License | **MPL-2.0**, `LICENSE` at `2e3b8eb7`. `crawler/` and `crawler-worker/` package.json also say MPL-2.0. GitHub shows SPDX "NOASSERTION", which is a detection quirk | VERIFIED |
+| Activity | HEAD commit 2026-10-07. 7 stars. No git tags | VERIFIED |
+| Stack | Cloudflare Workers with D1 (SQLite) and R2 (`worker/wrangler.toml.example`). `ngeohash` for spatial keys. LLM extraction via `openai` and `@anthropic-ai/sdk`. Jina Reader fetcher | VERIFIED (manifests and source) |
+| "335+ commits" | Not reproduced (shallow clone) | UNVERIFIED |
 
-### License: Mozilla Public License 2.0
-- **Type:** File-level copyleft (weak)
-- **Restrictions:** Modified files must be open-sourced; proprietary code can coexist
-- **Risk Level:** ⚠️ **MEDIUM (manageable with proper documentation)**
+**Notes:** MPL-2.0 is file-level copyleft, so copying a file would carry MPL obligations for that file. Under the reference-only policy, nothing is copied. The earlier draft suggested reusing "Tokoro's prompts", which has been withdrawn: prompts in MPL files are covered too. Write your own. **INFERRED.**
+Tokoro's crawler uses a third-party reader service (`r.jina.ai`). Any similar approach in this project needs its own terms and source review (see `05`). **INFERRED.**
 
-### Technology Stack
-- **Backend:** Cloudflare Workers (serverless)
-- **Database:** D1 SQLite (Cloudflare)
-- **Language:** TypeScript
-- **Event Extraction:** LLM-powered (Claude/OpenAI)
-- **Geospatial:** Geohashing for spatial indexing
-- **Key Features:** Event crawling/extraction, LLM-based content parsing, Telegram bot, browser extension, API
-
-### Reusable Components
-✅ **Event extraction pipeline** — LLM + structured data extraction  
-✅ **Geohashing spatial index** — Geographic bounding queries  
-✅ **Crawler framework** — Content extraction from web pages  
-✅ **Multi-client support** — Web, Telegram, Chrome extension patterns  
-
-### Assessment
-**Strengths:**
-- Innovative LLM-based extraction approach
-- Minimal infrastructure (serverless, free tier capable)
-- Real-world event extraction proven
-- Modern TypeScript codebase
-
-**Limitations:**
-- Early-stage (7 stars, solo developer)
-- Geohashing spatial queries less sophisticated than PostGIS
-- Serverless architecture conflicts with recommended self-hosted deployment model
-- LLM-dependent (requires OpenAI/Claude API keys)
-- SQLite (not suitable for scale)
-
-**Recommendation:** 📚 **STUDY for event extraction patterns.** If you implement custom LLM-based event extraction, reference Tokoro's prompts and deduplication logic. For spatial queries, PostGIS is superior. Can reference Tokoro's code without full reuse due to MPL 2.0 file-level copyleft.
+**Recommendation:** Reference only. Study the pipeline shape (discover, fetch, extract, dedupe, geocode).
 
 ---
 
-## 5. Strapi: Headless CMS
+## 5. Strapi (headless CMS): CMS candidate
 
-**Repository:** https://github.com/strapi/strapi  
-**Stars:** 73,300 | Forks:** Extensive  
-**Latest Release:** v5.57.0 (October 7, 2026)  
-**Status:** ACTIVELY MAINTAINED (very active)  
+| Item | Finding | Tag |
+|---|---|---|
+| URL / identity | https://github.com/strapi/strapi. Not a fork | VERIFIED |
+| Latest release | v5.57.0 (tag `ca3974da`, 2026-10-07). HEAD `5ca3fb20` 2026-10-09 | VERIFIED |
+| Popularity | 73,293 stars | VERIFIED (API) |
+| License | **Not plain MIT.** Root `LICENSE`: code under `ee/` dirs is Enterprise; everything else is MIT "if ... you have no registered account on our cloud offering" | VERIFIED |
+| EE packages | `packages/core/review-workflows` and `packages/core/content-releases` are **entirely Enterprise-licensed**, and `@strapi/strapi` 5.57.0 depends on both. Audit logs and SSO live in `packages/core/admin/ee/` | VERIFIED |
+| Runtime | Node >=20 <=26 (npm). Docs: active/maintenance LTS (22/24/26). PostgreSQL 14+ | VERIFIED |
+| Hardware | Min 1 core / 2 GB RAM, recommended 2 cores / 4 GB | VERIFIED (docs) |
+| i18n | In Strapi 5 core, free tier | VERIFIED (docs and `packages/plugins/i18n/LICENSE` MIT) |
+| Geo fields | No native geometry type found in `@strapi/database` | VERIFIED (absence in inspected module only, so a plugin may exist; not exhaustive) |
+| Paid-tier features | Releases (Growth $45/mo). Review Workflows, Audit Logs (Enterprise). SSO (Enterprise / Growth add-on) | VERIFIED (pricing page) |
 
-### License: MIT (Community Edition)
-- **Type:** Permissive
-- **Enterprise Edition:** Proprietary (but community edition fully functional)
-- **Risk Level:** ✅ **ACCEPTABLE**
+> Correction: the earlier draft listed "review workflows, releases scheduling" as MIT Community features and called Strapi "100% MIT". Both are wrong. Details in `02` §5 and `07`.
 
-### Technology Stack
-- **Language:** 100% JavaScript/TypeScript
-- **Frontend:** React 18.3.2
-- **Backend:** Node.js 20-26.x
-- **Build:** SWC, Rollup, Nx
-- **Database:** PostgreSQL, MySQL, SQLite, MariaDB support
-- **API:** Auto-generated REST + GraphQL
-- **Key Features:** Content type builder, media library, role-based permissions, review workflows, releases scheduling
-
-### Reusable Components
-✅ **Content modeling** — No-code content type builder  
-✅ **Editorial workflows** — Draft/publish, approvals, content scheduling  
-✅ **Multi-language support** — i18n framework  
-✅ **Media management** — Integrated library with folder organization  
-✅ **API generation** — Auto-generated REST + GraphQL from schema  
-
-### Assessment
-**Strengths:**
-- MIT license fully commercial-compatible
-- Excellent for editorial content (articles, guides, recommendations)
-- Mature ecosystem (73k stars)
-- Multi-language support
-- API-first (no server-side rendering)
-- Can run self-hosted or on Strapi Cloud
-
-**Limitations:**
-- Not a data-centric database (designed for editorial content only)
-- Separate from business logic (not a backend framework like NestJS)
-- Requires additional backend for complex API logic
-
-**Recommendation:** ✅ **USE for editorial CMS.** Strapi MIT community edition covers all editorial requirements (articles, guides, recommendations, media management). Deploy self-hosted in Docker alongside NestJS for full backend control.
+**Recommendation:** Still a viable CMS. See `07` for the comparison and the proposal.
 
 ---
 
-## 6. Directus: Database CMS
+## 6. Directus (data platform / CMS): CMS candidate
 
-**Repository:** https://github.com/directus/directus  
-**Stars:** 38,395 | Forks:** 4,965  
-**Latest Release:** v12.5.0 (October 7, 2026)  
-**Status:** ACTIVELY MAINTAINED  
+| Item | Finding | Tag |
+|---|---|---|
+| URL / identity | https://github.com/directus/directus. Not a fork | VERIFIED |
+| Latest release | v12.5.0 (tag `4f77933b`, 2026-10-07). HEAD `8e140f94` 2026-10-09 | VERIFIED |
+| Popularity | 38,397 stars | VERIFIED (API) |
+| License (v12+) | **Monospace Sustainable Core License 1.0 (MSCL-1.0-GPL)**: source-available, any purpose except "Competing Use", no tampering with license keys, each version becomes GPL-3.0 after 4 years | VERIFIED (`license` at v12.5.0) |
+| Revenue threshold | **Not in the license text.** It lives in the separate **Open Innovation Grant**: free full access for entities under $5M annual revenue *and* under 50 employees. Above that, the free **Core** tier is capped at 3 seats, 25 collections, and 5 flows | VERIFIED (pricing, grant docs) |
+| Prior license | ≤ v11 used BSL 1.1 with a $5M "Total Finances" grant (revenue, budget, or funding, incl. affiliates) | VERIFIED (`license` at v11.17.4) |
+| Enforcement | v12 code enforces entitlements: collections, seats, flows, SSO, custom LLMs, custom permission rules | VERIFIED (`api/src/license/entitlements/manager.ts`) |
+| Runtime | `@directus/api` 40.0.0, node >=22. Distributed as a Docker image | VERIFIED |
+| Hardware | Min 0.25 vCPU / 512 MB, recommended 1 vCPU / 2 GB. Redis optional for a single instance | VERIFIED (docs) |
+| Geo fields | Native geometry types (Point…MultiPolygon). The postgres dialect detects PostGIS | VERIFIED (source and API docs) |
+| Activity / revisions | `directus_activity` and `directus_revisions` services, not entitlement-gated | VERIFIED (source) |
 
-### License: Monospace Sustainable Core License 1.0 (MSCL 1.0)
-- **Type:** Source-available (not fully open source)
-- **Commercial Restrictions:** Organizations >$5M revenue must purchase license
-- **Self-Hosted:** Can self-host if under $5M revenue
-- **Risk Level:** ⚠️ **HIGH for growth projections >$5M**
+> Correction: the earlier draft said the MSCL itself contains a "$5M revenue" restriction and quoted a "$5–15K/year" license cost. The threshold belongs to the grant, not the license. No such price is published: Team is $499/mo, and Enterprise is custom.
 
-### Technology Stack
-- **Language:** Node.js 22+, TypeScript 5.9.3
-- **Frontend:** Vue 3.5.43, Vite
-- **Backend:** Express 4.22.3 + Fastify 5.12.5
-- **Database:** PostgreSQL, MySQL, SQLite, Oracle, SQL Server, CockroachDB
-- **API:** Auto-generated REST + GraphQL
-- **Key Features:** Database abstraction layer, no-code admin, schema mirroring, extensibility
-
-### Reusable Components
-✅ **Database abstraction** — Schema-agnostic API generation  
-✅ **Multi-database support** — Same API for any SQL database  
-✅ **Admin interface** — No-code configuration and data management  
-✅ **Extensibility** — Custom hooks, fields, modules  
-
-### Assessment
-**Strengths:**
-- Database-agnostic (works with existing PostgreSQL)
-- Can eliminate separate CMS database (Directus becomes your admin layer)
-- More powerful than Strapi for data-heavy applications
-- Excellent for APIs over existing databases
-
-**Why Not to Use:**
-- MSCL licensing creates ambiguity: is aggregate revenue >$5M threshold? When does it trigger?
-- License cost ($5-15K/year) adds operational expense
-- Strapi alternative eliminates licensing uncertainty
-- If you project significant revenue, Directus license becomes mandatory requirement
-
-**Recommendation:** ⚠️ **CONSIDER STRAPI instead.** Use Strapi (MIT) for editorial content + custom NestJS endpoints for complex logic. If you need database abstraction layer, use PostGIS/TypeORM directly instead of Directus wrapper. Avoids MSCL licensing complexity.
+**Recommendation:** Viable CMS, with licensing caveats. See `07`.
 
 ---
 
-## 7. Leaflet: Mapping Library
+## 7. Leaflet (map library): dependency, keep
 
-**Repository:** https://github.com/Leaflet/Leaflet  
-**Stars:** 45,723 | Forks:** 6,180  
-**Latest Stable Release:** v1.9.4 (May 18, 2024)  
-**Latest Development:** v2.0.0-alpha.1  
-**Status:** ACTIVELY MAINTAINED  
+| Item | Finding | Tag |
+|---|---|---|
+| URL / identity | https://github.com/Leaflet/Leaflet. Not a fork | VERIFIED |
+| License | **BSD-2-Clause** (`LICENSE` at tag v1.9.4 and at HEAD `125bda1e`) | VERIFIED |
+| Stable | **v1.9.4 = `d15112c9`, released 2023-05-18**. npm `latest` = 1.9.4 | VERIFIED |
+| Development | `main` = 2.0.0-alpha.1 (pre-release 2025-08-16). Last commit 2026-09-19, pushed 2026-10-05 | VERIFIED |
+| Runtime dependencies | None (`package.json`) | VERIFIED |
+| Plugins | leaflet.markercluster 1.5.3 MIT | VERIFIED (npm) |
+| "~40 KB gzipped", "50k+ markers proven" | Not measured | UNVERIFIED |
 
-### License: BSD 2-Clause
-- **Type:** Permissive
-- **Commercial Use:** Fully allowed, no restrictions
-- **Risk Level:** ✅ **ACCEPTABLE**
+> Correction: the previous draft gave the v1.9.4 release date as 2024-05-18. It was 2023-05-18.
 
-### Capabilities
-✅ **GeoJSON rendering** — Native support for county boundaries  
-✅ **Marker clustering** — leaflet.markercluster plugin (proven for 50k+ markers)  
-✅ **Vector tiles** — 7+ dedicated plugins (Leaflet.VectorGrid, geojson-vt, etc.)  
-✅ **Zoom-dependent rendering** — Tile layer architecture only renders visible tiles  
-✅ **TypeScript support** — DefinitelyTyped (@types/leaflet)  
-✅ **React integration** — react-leaflet library (v5.x)  
-✅ **Tile sources** — OpenStreetMap, self-hosted, WMS/WMTS  
-
-### Assessment
-**Strengths:**
-- Lightweight (~40KB gzipped)
-- No external dependencies
-- Excellent documentation
-- Large plugin ecosystem
-- Used in production by major platforms
-
-**Limitations:**
-- v1.9.4 is stable (recommended for production)
-- v2.0 still alpha (breaking changes)
-- Clustering plugins add weight (but necessary for 50k+ POIs)
-
-**Recommendation:** ✅ **USE Leaflet v1.9.4.** Pair with leaflet.markercluster for POI clustering. Use self-hosted tiles (TileServer GL) or OpenStreetMap with proper attribution. Excellent choice for map-first tourism platform.
+**Recommendation:** Use Leaflet 1.9.x for the MVP. Re-check 2.0 once it leaves alpha. **INFERRED.** Note the attribution notice in the bundled build.
 
 ---
 
-## 8. PostGIS: Spatial Database
+## 8. PostGIS (spatial database extension): dependency, keep
 
-**Repository:** https://github.com/postgis/postgis  
-**Stars:** Standard dependency  
-**Latest Stable Release:** v3.6.0 (September 1, 2025)  
-**Development:** v3.7.0rc1 (August 24, 2026)  
-**Status:** ACTIVELY MAINTAINED  
+| Item | Finding | Tag |
+|---|---|---|
+| URL / identity | https://github.com/postgis/postgis. The GitHub repo is a mirror. The README points to the OSGeo Trac/Gitea as the development home | VERIFIED (README) |
+| License | **GPL-2.0-or-later** ("version 2 or (at your option) any later version", `LICENSE.TXT`, `COPYING`) | VERIFIED |
+| Bundled/linked deps | PROJ (MIT), GEOS (LGPL), GDAL (MIT-style), libxml2 (MIT), SFCGAL (GPLv2+). Docs CC BY-SA 3.0 | VERIFIED (`LICENSE.TXT`) |
+| Releases | 3.6.0 (2025-09-01). **Latest stable tag 3.6.4 (2026-06-08)**. 3.7.0rc2 (2026-09-08). `main` = 3.7.0dev | VERIFIED |
+| Activity | HEAD `9e97dbf6` 2026-10-11 | VERIFIED |
+| Performance (<100 ms viewport) | Not benchmarked | UNVERIFIED |
 
-### License: GPL v2
-- **Type:** Strong copyleft (NO network clause)
-- **External Service Exception:** If PostGIS runs as external database (not embedded), GPL compliance manageable
-- **Risk Level:** ⚠️ **MEDIUM (requires external service model)**
+> Correction: the previous draft gave the latest stable release as 3.6.0 and the latest development release as 3.7.0rc1. Both were stale.
 
-### Capabilities
-✅ **Spatial queries** — ST_Contains, ST_Within, ST_Intersects, point-in-polygon  
-✅ **Regional performance** — Geometry type optimized for local data (Hungary)  
-✅ **Spatial indexing** — GIST indexes for efficient POI queries  
-✅ **Viewport queries** — Bounding box filters with < 100ms response times  
-✅ **Distance operations** — ST_Distance, ST_DWithin for proximity searches  
-✅ **Docker support** — postgis/postgis images (weekly updates)  
-✅ **TypeORM integration** — Spatial column support with Z/M dimension detection  
+**License assessment (revised):** Your application talks to PostGIS over the PostgreSQL wire protocol (SQL over a socket) in a separate server process. The PostGIS FAQ says the GPL's share-alike terms do not apply to loading data and running queries, so applications may use any license. The FSF GPL FAQ says that programs communicating over sockets are normally separate programs (#MereAggregation), and that running GPL software on a server without distributing it requires no source release (#UnreleasedMods). So a proprietary NestJS app that uses an unmodified PostGIS server is **very likely unaffected** by the GPL. **INFERRED.** Obligations would arise only if PostGIS itself (modified or not) is *distributed* to third parties, for example by shipping a Docker image to a customer. Even then they cover PostGIS, not your app. A short legal review remains *advisable* as general hygiene, but it is **not a blocker**. See `02` §2.
 
-### Assessment
-**Strengths:**
-- Industry standard for GIS applications
-- PostgreSQL native (works with recommended stack)
-- Free (GPL v2)
-- Excellent performance for regional boundaries
-- Active maintenance (31+ commits Oct 2026)
-
-**Compliance Considerations:**
-- GPL v2 copyleft applies to modifications only
-- If PostGIS runs as external database service (not embedded in proprietary binary), compliance is likely satisfied
-- SQL queries to PostGIS do NOT trigger GPL (queries are separate from code)
-- **Unresolved:** "Linking vs. aggregation" interpretation under GPL v2 is jurisdiction-dependent; recommend legal counsel review
-
-**Recommendation:** ✅ **USE PostGIS as external database service.** Architecture must keep PostGIS in separate containerized database layer (never embed PostGIS code in proprietary binaries). Obtain legal opinion on GPL v2 interpretation before final commitment.
+**Recommendation:** Use PostGIS, unmodified, as a separate database service.
 
 ---
 
-## Summary Table: Repository Assessment
+## Summary table
 
-| Repository | License | Type | Status | Recommendation | Risk |
-|------------|---------|------|--------|-----------------|------|
-| TREK | AGPL v3 | Travel planner | Maintained | ❌ AVOID | UNACCEPTABLE |
-| TRIP | MIT | POI tracker | Maintained | 📚 STUDY | LOW |
-| Mobilizon | AGPL v3 | Event management | Maintained | ❌ AVOID | UNACCEPTABLE |
-| Tokoro | MPL 2.0 | Event extraction | Active | 📚 STUDY | MEDIUM |
-| Strapi | MIT | Headless CMS | Very active | ✅ USE | ACCEPTABLE |
-| Directus | MSCL 1.0 | Database CMS | Very active | ⚠️ RECONSIDER | HIGH |
-| Leaflet | BSD-2-Clause | Mapping library | Maintained | ✅ USE | ACCEPTABLE |
-| PostGIS | GPL v2 | Spatial database | Very active | ✅ USE* | MEDIUM* |
-
-*PostGIS with requirement: maintain as external service, not embedded.
+| Candidate | License (verified) | Role under approved decisions | Notes |
+|---|---|---|---|
+| TREK | AGPL-3.0 (+ trademark policy) | Reference only | mapbox-gl v3 dependency |
+| TRIP | MIT | Reference only | Closest Angular+Leaflet reference |
+| Mobilizon | AGPL-3.0 | Reference only | Latest 5.2.4 (not 4.1.0) |
+| Tokoro | MPL-2.0 | Reference only | Don't reuse prompts or files |
+| Strapi | MIT + Enterprise parts (`ee/`, review-workflows, content-releases) | CMS candidate | Audit logs and review workflows are Enterprise |
+| Directus | MSCL-1.0 (source-available) + Innovation Grant | CMS candidate | Native geo, activity log. Grant/Core-limit caveats |
+| Leaflet | BSD-2-Clause | Dependency | 1.9.4 (2023-05-18) |
+| PostGIS | GPL-2.0-or-later | Dependency | Separate server, SQL only: low risk (INFERRED) |
 
 ---
 
-## Verification Status
+## Verification log (2026-10-11)
 
-**VERIFIED** — All findings based on:
-- Direct GitHub repository inspection
-- Official documentation review
-- License file analysis
-- Commit history review (Oct 2026)
-- Dependency manifest inspection
-
-**Access Failures:** None significant. All repositories publicly accessible.
-
+- **Method:** Shallow clones (`git clone --depth 1 --filter=blob:none`, sparse for Strapi/Directus) into `%TEMP%\momap-audit\`, outside the repo. Read `LICENSE` and manifests. GitHub REST API / framagit GitLab API for identity, fork status, stars, and release dates. Tag-vs-HEAD license diffs for Strapi and Directus (`diff --strip-trailing-cr`, identical). No code was copied into the repo, and nothing was built or run.
+- **Revisions inspected:** TREK `1c05ee4b3ac9` · TRIP `856b1edfe81a` · Mobilizon `f2590486f6ee` · Tokoro `2e3b8eb732eb` · Strapi `5ca3fb208a88` (and tag v5.57.0 `ca3974dac317`) · Directus `8e140f942508` (and tags v12.5.0 `4f77933bf955`, v11.17.4) · Leaflet `125bda1e24d7` (and tag v1.9.4 `d15112c9e8ac`) · PostGIS `9e97dbf69ea7`.
+- **Corrections:** Mobilizon latest release (5.2.4, not 4.1.0). Leaflet 1.9.4 date (2023, not 2024). PostGIS latest stable (3.6.4) and rc (3.7.0rc2). Strapi is not plain MIT (EE packages ship in the default install). Directus's $5M threshold is in the grant, not the MSCL, and the "$5–15K/yr" price was unsupported. The PostGIS "legal opinion required" claim is downgraded to "advisable". The Mobilizon-as-a-service and Tokoro-prompt-reuse suggestions are withdrawn under the reference-only policy. The blanket "all VERIFIED" statement has been removed.
+- **Still UNVERIFIED:** feature lists of TREK/Mobilizon, TRIP fork count, Tokoro commit count, Leaflet size/performance claims, PostGIS performance, Mobilizon docs site, dependency trees beyond direct manifests (no SBOM/license scan was run).
+- **BLOCKED:** confirming the redirect `framasoft/mobilizon` → `kaihuri/mobilizon` (anonymous request gets 302 to sign-in).
