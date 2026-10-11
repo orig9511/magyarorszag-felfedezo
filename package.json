@@ -1,0 +1,19 @@
+{
+  "name": "momap",
+  "version": "0.1.0",
+  "description": "Premium map-first tourism and local discovery platform for Hungary",
+  "private": true,
+  "workspaces": [
+    "apps/backend",
+    "apps/frontend"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev -w apps/backend\" \"npm run dev -w apps/frontend\"",
+    "build": "npm run build -w apps/backend && npm run build -w apps/frontend",
+    "test": "npm run test -w apps/backend && npm run test -w apps/frontend",
+    "lint": "npm run lint -w apps/backend && npm run lint -w apps/frontend"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

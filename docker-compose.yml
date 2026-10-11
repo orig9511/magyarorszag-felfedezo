@@ -1,0 +1,57 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgis/postgis:17-3.4
+    container_name: momap_postgres
+    environment:
+      POSTGRES_USER: momap
+      POSTGRES_PASSWORD: momap_dev
+      POSTGRES_DB: momap
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./apps/backend/src/migrations:/docker-entrypoint-initdb.d:ro
+    networks:
+      - momap
+
+  backend:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile.dev
+    container_name: momap_backend
+    depends_on:
+      - postgres
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://momap:momap_dev@postgres:5432/momap
+      PORT: 3000
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./apps/backend/src:/app/src
+    networks:
+      - momap
+
+  frontend:
+    build:
+      context: .
+      dockerfile: apps/frontend/Dockerfile.dev
+    container_name: momap_frontend
+    environment:
+      NODE_ENV: development
+      BACKEND_URL: http://backend:3000
+    ports:
+      - "4200:4200"
+    volumes:
+      - ./apps/frontend/src:/app/src
+    networks:
+      - momap
+
+volumes:
+  postgres_data:
+
+networks:
+  momap:
+    driver: bridge

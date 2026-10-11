@@ -1,0 +1,114 @@
+# ---------------------------------------------------------------
+# Dependencies
+# ---------------------------------------------------------------
+node_modules/
+.npm/
+.pnpm-store/
+.yarn/*
+!.yarn/releases
+!.yarn/plugins
+.pnp.*
+
+# ---------------------------------------------------------------
+# Build output and caches
+# ---------------------------------------------------------------
+dist/
+build/
+out/
+.angular/
+.nest/
+.cache/
+.parcel-cache/
+.eslintcache
+.stylelintcache
+*.tsbuildinfo
+coverage/
+.nyc_output/
+
+# ---------------------------------------------------------------
+# Secrets and environment files (never commit; only .env.example)
+# ---------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.kubeconfig
+secrets/
+credentials*.json
+service-account*.json
+
+# ---------------------------------------------------------------
+# Logs and runtime files
+# ---------------------------------------------------------------
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.pid
+*.seed
+*.pid.lock
+
+# ---------------------------------------------------------------
+# Local data: database volumes, dumps, map tiles, ingestion files
+# (large or potentially personal / license-restricted data)
+# ---------------------------------------------------------------
+pgdata/
+postgres-data/
+.docker-data/
+data/
+tmp/
+temp/
+*.dump
+*.sql.gz
+*.backup
+*.pmtiles
+*.mbtiles
+*.osm.pbf
+*.pbf
+uploads/
+
+# ---------------------------------------------------------------
+# Third-party source cloned for the audit (must never enter this repo)
+# ---------------------------------------------------------------
+momap-audit/
+audit-clones/
+
+# ---------------------------------------------------------------
+# Editors and IDEs (shared settings are kept explicitly)
+# ---------------------------------------------------------------
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
+.idea/
+*.iml
+*.swp
+*.swo
+*~
+
+# ---------------------------------------------------------------
+# Operating system files
+# ---------------------------------------------------------------
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ---------------------------------------------------------------
+# Claude Code: keep private conversation data and local settings out
+# ---------------------------------------------------------------
+.claude/.chats/
+.claude/settings.local.json
+CLAUDE.local.md
+.claude/CLAUDE.local.md
+
+# Team-shareable Claude files stay tracked:
+#   .claude/CLAUDE.md, .claude/settings.json, .claude/commands/, .claude/skills/, .claude/.plans/

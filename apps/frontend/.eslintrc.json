@@ -1,0 +1,11 @@
+[
+  {
+    "context": "src",
+    "glob": "**/*.ts",
+    "type": "linter",
+    "linter": "eslint",
+    "exclude": [
+      "**/node_modules/**"
+    ]
+  }
+]
