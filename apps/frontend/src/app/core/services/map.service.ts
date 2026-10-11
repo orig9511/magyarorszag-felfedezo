@@ -55,6 +55,7 @@ export class MapService {
   private pendingCounties: GeoJSON.FeatureCollection = EMPTY_FC;
   private hoveredCountyId?: string;
   private selectedCountyId?: string;
+  private pendingDetail?: { id: string; geometry: GeoJSON.MultiPolygon };
 
   /** Emits after every pan/zoom (and once when the map is first ready). */
   readonly viewportChange$: Observable<ViewportBounds> = this.viewport.asObservable();
@@ -131,18 +132,27 @@ export class MapService {
 
   /** Highlights a county with its accurate full-resolution outline and zooms to it. */
   showCountyDetail(countyId: string, geometry: GeoJSON.MultiPolygon) {
-    this.setSelected(countyId);
-    (this.map?.getSource(COUNTY_DETAIL_SOURCE) as GeoJSONSource | undefined)?.setData({
-      type: 'Feature',
-      geometry,
-      properties: {},
-    });
+    this.pendingDetail = { id: countyId, geometry }; // re-applied once the style has loaded, if needed
+    this.applyDetail();
     this.fitBoundsToCounty(geometry);
   }
 
   clearCountyDetail() {
-    this.setSelected(undefined);
-    (this.map?.getSource(COUNTY_DETAIL_SOURCE) as GeoJSONSource | undefined)?.setData(EMPTY_FC);
+    this.pendingDetail = undefined;
+    this.applyDetail();
+  }
+
+  /** Back to the initial country-wide view. */
+  resetView() {
+    this.map?.flyTo({ center: HUNGARY_CENTER, zoom: 7 });
+  }
+
+  private applyDetail() {
+    if (!this.map?.getSource(COUNTY_DETAIL_SOURCE)) return;
+    this.setSelected(this.pendingDetail?.id);
+    (this.map.getSource(COUNTY_DETAIL_SOURCE) as GeoJSONSource).setData(
+      this.pendingDetail ? { type: 'Feature', geometry: this.pendingDetail.geometry, properties: {} } : EMPTY_FC,
+    );
   }
 
   /** Replaces the POI markers; safe to call before the style has loaded. */
@@ -181,6 +191,7 @@ export class MapService {
     this.map = undefined;
     this.hoveredCountyId = undefined;
     this.selectedCountyId = undefined;
+    this.pendingDetail = undefined;
   }
 
   private setSelected(id?: string) {
@@ -193,6 +204,7 @@ export class MapService {
   private addCountyLayers(map: MapLibreMap) {
     map.addSource(COUNTY_SOURCE, { type: 'geojson', data: this.pendingCounties, promoteId: 'id' });
     map.addSource(COUNTY_DETAIL_SOURCE, { type: 'geojson', data: EMPTY_FC });
+    this.applyDetail();
 
     // Subtle tint so the basemap and POI markers (added later, drawn on top) stay readable.
     map.addLayer({

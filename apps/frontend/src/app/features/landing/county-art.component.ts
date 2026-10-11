@@ -1,10 +1,12 @@
 import { ChangeDetectionStrategy, ChangeDetectorRef, Component, EventEmitter, OnInit, Output } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { CountyService, CountySummary } from '../../core/services/county.service';
+import { Router } from '@angular/router';
+import { CountyService, CountySummary, countySlug } from '../../core/services/county.service';
 
 interface ArtCounty {
   id: string;
   name: string;
+  slug: string;
   active: boolean;
   d: string;
 }
@@ -20,20 +22,24 @@ interface ArtCounty {
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <figure class="art" *ngIf="counties.length">
-      <svg [attr.viewBox]="viewBox" role="img" aria-label="Magyarország vármegyéinek határai">
-        <g>
-          <path
-            *ngFor="let c of counties; let i = index"
-            [attr.d]="c.d"
+      <svg [attr.viewBox]="viewBox" role="group" aria-label="Magyarország vármegyéi: válassz egyet a felfedezéshez">
+        <ng-container *ngFor="let c of counties; let i = index">
+          <a
+            [attr.href]="'/explore?county=' + c.slug"
+            [attr.aria-label]="c.name + ' vármegye megnyitása a térképen'"
             [class.hover]="c.id === hovered"
-            [class.inactive]="!c.active"
             [style.--i]="i"
+            (click)="open($event, c)"
             (mouseenter)="hover(c.id)"
             (mouseleave)="hover(null)"
-          />
-        </g>
+            (focus)="hover(c.id)"
+            (blur)="hover(null)"
+          >
+            <path [attr.d]="c.d" />
+          </a>
+        </ng-container>
       </svg>
-      <figcaption aria-live="polite">{{ hoveredName || 'Valós vármegyehatárak' }}</figcaption>
+      <figcaption aria-live="polite">{{ hoveredName || 'Válassz vármegyét' }}</figcaption>
     </figure>
   `,
   styles: [
@@ -41,6 +47,7 @@ interface ArtCounty {
       :host { display: block; }
       .art { margin: 0; }
       svg { display: block; width: 100%; height: auto; overflow: visible; }
+      a { cursor: pointer; outline: none; }
       path {
         fill: rgba(198, 240, 90, 0.07);
         stroke: rgba(198, 240, 90, 0.75);
@@ -48,11 +55,10 @@ interface ArtCounty {
         stroke-linejoin: round;
         vector-effect: non-scaling-stroke;
         transition: fill 0.25s ease;
-        animation: draw-in 0.9s ease both;
-        animation-delay: calc(var(--i) * 45ms + 250ms);
       }
-      path.inactive { stroke: rgba(242, 239, 230, 0.35); fill: rgba(242, 239, 230, 0.03); }
-      path.hover { fill: rgba(198, 240, 90, 0.28); }
+      a { animation: draw-in 0.9s ease both; animation-delay: calc(var(--i) * 45ms + 250ms); }
+      a.hover path { fill: rgba(198, 240, 90, 0.3); }
+      a:focus-visible path { stroke: #f2efe6; stroke-width: 3; fill: rgba(198, 240, 90, 0.3); }
       figcaption {
         margin-top: 0.75rem;
         min-height: 1.4em;
@@ -63,7 +69,7 @@ interface ArtCounty {
         text-align: right;
       }
       @keyframes draw-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-      @media (prefers-reduced-motion: reduce) { path { animation: none; transition: none; } }
+      @media (prefers-reduced-motion: reduce) { a { animation: none; } path { transition: none; } }
     `,
   ],
 })
@@ -79,6 +85,7 @@ export class CountyArtComponent implements OnInit {
   constructor(
     private countyService: CountyService,
     private cdr: ChangeDetectorRef,
+    private router: Router,
   ) {}
 
   ngOnInit() {
@@ -92,6 +99,11 @@ export class CountyArtComponent implements OnInit {
         this.loaded.emit(0); // decorative only: fail silently
       },
     });
+  }
+
+  open(event: Event, county: ArtCounty) {
+    event.preventDefault();
+    this.router.navigate(['/explore'], { queryParams: { county: county.slug } });
   }
 
   hover(id: string | null) {
@@ -115,6 +127,7 @@ export class CountyArtComponent implements OnInit {
     const raw = list.map((c) => ({
       id: c.id,
       name: c.name,
+      nameEn: c.nameEn,
       active: c.active,
       rings: c.displayGeometry!.coordinates.flatMap((poly) => poly.map((ring) => ring.map(project))),
     }));
@@ -122,6 +135,7 @@ export class CountyArtComponent implements OnInit {
     this.counties = raw.map((c) => ({
       id: c.id,
       name: c.name,
+      slug: countySlug({ nameEn: c.nameEn }),
       active: c.active,
       d: c.rings.map((r) => 'M' + r.map(([x, y]) => `${f(x - minX)} ${f(y - minY)}`).join('L') + 'Z').join(''),
     }));

@@ -83,7 +83,7 @@
       </div>
       <ul class="cat-list">
         <li class="reveal" *ngFor="let c of categories; let i = index">
-          <a routerLink="/explore">
+          <a routerLink="/explore" [queryParams]="{ category: c.key }">
             <span class="cat-index" aria-hidden="true">{{ i + 1 < 10 ? '0' + (i + 1) : i + 1 }}</span>
             <span class="cat-name">{{ c.name }}</span>
             <span class="cat-text">{{ c.text }}</span>

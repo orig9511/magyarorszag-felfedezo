@@ -20,6 +20,16 @@ export interface CountyGeometry {
   geometry: GeoJSON.MultiPolygon;
 }
 
+/** URL-safe county identifier derived from the English name, e.g. 'Hajdu-Bihar' -> 'hajdu-bihar'. */
+export function countySlug(county: Pick<CountySummary, 'nameEn'>): string {
+  return county.nameEn
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 @Injectable({
   providedIn: 'root',
 })
