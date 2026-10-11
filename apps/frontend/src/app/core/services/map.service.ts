@@ -1,7 +1,8 @@
 import { Injectable, NgZone } from '@angular/core';
 import type { CountySummary } from './county.service';
 import { Observable, Subject } from 'rxjs';
-import maplibregl, { GeoJSONSource, LngLatBounds, Map as MapLibreMap } from 'maplibre-gl';
+import maplibregl, { GeoJSONSource, LngLatBounds, Map as MapLibreMap, Marker } from 'maplibre-gl';
+import { MAP_STYLE } from '../config/map-style';
 
 export interface ViewportBounds {
   minLat: number;
@@ -18,25 +19,13 @@ export interface MapPoint {
   location?: { type: 'Point'; coordinates: [number, number] } | null;
 }
 
-// DEVELOPMENT ONLY base map: OSMF raster tiles. Their usage policy forbids relying on them in
-// production (see docs/research/04-geospatial-data-and-mapping.md §2.2); swap this style for the
-// self-hosted PMTiles / paid provider before launch.
-const DEV_STYLE: maplibregl.StyleSpecification = {
-  version: 8,
-  sources: {
-    osm: {
-      type: 'raster',
-      tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-      tileSize: 256,
-      maxzoom: 19,
-      attribution:
-        '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors',
-    },
-  },
-  layers: [{ id: 'osm', type: 'raster', source: 'osm' }],
-};
+interface MarkerEntry {
+  marker: Marker;
+  el: HTMLButtonElement;
+}
 
-const POI_SOURCE = 'pois';
+const MAX_MARKERS = 300; // DOM markers are fine up to a few hundred; the API caps a viewport at 1000
+const LABEL_ZOOM = 9; // below this zoom markers are plain dots (labels would overlap)
 const COUNTY_SOURCE = 'counties';
 const COUNTY_DETAIL_SOURCE = 'county-detail';
 const EMPTY_FC: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] };
@@ -48,7 +37,9 @@ const HUNGARY_CENTER: [number, number] = [19.5033, 47.1625]; // [lng, lat]
 export class MapService {
   private map?: MapLibreMap;
   private resizeObserver?: ResizeObserver;
-  private pendingPOIs: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] };
+  private markers = new Map<string, MarkerEntry>();
+  private selectedPoiId?: string;
+  private readonly poiClick = new Subject<string>();
   private readonly viewport = new Subject<ViewportBounds>();
   private readonly status = new Subject<'ready' | string>();
   private readonly countyClick = new Subject<string>();
@@ -65,44 +56,28 @@ export class MapService {
   /** Emits the id of an active county the user clicked (not when a POI marker was hit). */
   readonly countyClick$: Observable<string> = this.countyClick.asObservable();
 
+  /** Emits the id of a POI marker the user clicked. */
+  readonly poiClick$: Observable<string> = this.poiClick.asObservable();
+
   constructor(private zone: NgZone) {}
 
   initializeMap(container: HTMLElement, center: [number, number] = HUNGARY_CENTER, zoom = 7) {
     this.destroy();
     // Keep MapLibre's frequent mouse/animation events outside Angular change detection.
     this.zone.runOutsideAngular(() => {
-      const map = new maplibregl.Map({ container, style: DEV_STYLE, center, zoom, minZoom: 5 });
+      const map = new maplibregl.Map({ container, style: MAP_STYLE, center, zoom, minZoom: 5 });
       this.map = map;
       map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
       map.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-left');
 
       map.on('load', () => {
         this.addCountyLayers(map);
-        map.addSource(POI_SOURCE, { type: 'geojson', data: this.pendingPOIs });
-        map.addLayer({
-          id: 'poi-points',
-          type: 'circle',
-          source: POI_SOURCE,
-          paint: {
-            'circle-radius': 7,
-            'circle-color': '#667eea',
-            'circle-stroke-color': '#ffffff',
-            'circle-stroke-width': 2,
-          },
-        });
-        map.on('mouseenter', 'poi-points', () => (map.getCanvas().style.cursor = 'pointer'));
-        map.on('mouseleave', 'poi-points', () => (map.getCanvas().style.cursor = ''));
-        map.on('click', 'poi-points', (e) => {
-          const f = e.features?.[0];
-          if (!f || f.geometry.type !== 'Point') return;
-          new maplibregl.Popup()
-            .setLngLat(f.geometry.coordinates as [number, number])
-            .setText(String(f.properties?.['name'] ?? ''))
-            .addTo(map);
-        });
         this.zone.run(() => this.status.next('ready'));
         this.emitViewport();
       });
+      const syncLabels = () => map.getContainer().classList.toggle('mm-labels', map.getZoom() >= LABEL_ZOOM);
+      map.on('zoom', syncLabels);
+      syncLabels();
       map.on('moveend', () => this.emitViewport());
       map.on('error', (e) => {
         const message = e.error?.message ?? 'Map error';
@@ -155,20 +130,56 @@ export class MapService {
     );
   }
 
-  /** Replaces the POI markers; safe to call before the style has loaded. */
+  /** Syncs the POI markers with the list (adds new, removes stale, keeps existing ones to avoid flicker). */
   setPOIs(pois: MapPoint[]) {
-    this.pendingPOIs = {
-      type: 'FeatureCollection',
-      features: pois
-        .filter((p) => p.location?.type === 'Point')
-        .map((p) => ({
-          type: 'Feature' as const,
-          geometry: p.location as GeoJSON.Point,
-          properties: { id: p.id, name: p.name, category: p.category },
-        })),
-    };
-    const source = this.map?.getSource(POI_SOURCE) as GeoJSONSource | undefined;
-    source?.setData(this.pendingPOIs);
+    const map = this.map;
+    if (!map) return;
+    const wanted = pois.filter((p) => p.location?.type === 'Point').slice(0, MAX_MARKERS);
+    const ids = new Set(wanted.map((p) => p.id));
+    for (const [id, entry] of this.markers) {
+      if (!ids.has(id)) {
+        entry.marker.remove();
+        this.markers.delete(id);
+      }
+    }
+    for (const poi of wanted) {
+      if (this.markers.has(poi.id)) continue;
+      const el = document.createElement('button');
+      el.type = 'button';
+      el.className = `mm-marker mm-cat-${poi.category}`;
+      el.setAttribute('aria-label', poi.name);
+      el.innerHTML = '<span class="mm-dot" aria-hidden="true"></span><span class="mm-label"></span>';
+      (el.querySelector('.mm-label') as HTMLElement).textContent = poi.name;
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.zone.run(() => this.poiClick.next(poi.id));
+      });
+      const marker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
+        .setLngLat(poi.location!.coordinates as [number, number])
+        .addTo(map);
+      this.markers.set(poi.id, { marker, el });
+    }
+    this.applySelected();
+  }
+
+  /** Hover highlight from the results list (null clears). */
+  highlightPOI(id: string | null) {
+    for (const [pid, { el }] of this.markers) el.classList.toggle('is-hover', pid === id);
+  }
+
+  /** Persistent selected state (null clears). */
+  selectPOI(id: string | null) {
+    this.selectedPoiId = id ?? undefined;
+    this.applySelected();
+  }
+
+  private applySelected() {
+    for (const [pid, { el }] of this.markers) {
+      const on = pid === this.selectedPoiId;
+      el.classList.toggle('is-selected', on);
+      el.style.zIndex = on ? '5' : '';
+      el.setAttribute('aria-pressed', String(on));
+    }
   }
 
   flyTo(lng: number, lat: number, zoom = 14) {
@@ -187,6 +198,9 @@ export class MapService {
 
   destroy() {
     this.resizeObserver?.disconnect();
+    this.markers.forEach(({ marker }) => marker.remove());
+    this.markers.clear();
+    this.selectedPoiId = undefined;
     this.map?.remove();
     this.map = undefined;
     this.hoveredCountyId = undefined;
@@ -240,8 +254,6 @@ export class MapService {
     });
 
     const tooltip = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 8 });
-    const hitsPOI = (p: maplibregl.PointLike) =>
-      map.getLayer('poi-points') ? map.queryRenderedFeatures(p, { layers: ['poi-points'] }).length > 0 : false;
     const setHover = (id?: string) => {
       if (id === this.hoveredCountyId) return;
       if (this.hoveredCountyId) map.setFeatureState({ source: COUNTY_SOURCE, id: this.hoveredCountyId }, { hover: false });
@@ -251,7 +263,7 @@ export class MapService {
 
     map.on('mousemove', 'county-fill', (e) => {
       const f = e.features?.[0];
-      if (!f || hitsPOI(e.point)) {
+      if (!f) {
         setHover(undefined);
         tooltip.remove();
         return;
@@ -268,7 +280,7 @@ export class MapService {
     });
     map.on('click', 'county-fill', (e) => {
       const f = e.features?.[0];
-      if (!f || !f.properties?.['active'] || hitsPOI(e.point)) return;
+      if (!f || !f.properties?.['active']) return;
       this.zone.run(() => this.countyClick.next(String(f.id)));
     });
   }

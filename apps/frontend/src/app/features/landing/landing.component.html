@@ -2,22 +2,57 @@
 
 <header class="site-header">
   <div class="wrap bar">
-    <a class="brand" routerLink="/" aria-label="Momap, főoldal">Momap</a>
-    <nav aria-label="Főmenü">
+    <a class="brand" routerLink="/" aria-label="Momap, főoldal">
+      <svg class="logo" viewBox="0 0 24 24" width="26" height="26" aria-hidden="true" focusable="false">
+        <path d="M12 2.5c-3.6 0-6.5 2.8-6.5 6.4 0 4.6 6.5 12.6 6.5 12.6s6.5-8 6.5-12.6c0-3.6-2.9-6.4-6.5-6.4z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
+        <circle cx="12" cy="9" r="2.4" fill="currentColor" />
+      </svg>
+      <span>Momap</span>
+    </a>
+
+    <nav class="nav-desktop" aria-label="Főmenü">
       <a href="#kiemelt" (click)="scrollTo('kiemelt', $event)">Kiemelt helyek</a>
       <a href="#kategoriak" (click)="scrollTo('kategoriak', $event)">Kategóriák</a>
       <a href="#hogyan" (click)="scrollTo('hogyan', $event)">Hogyan működik?</a>
-      <a class="nav-cta" routerLink="/explore">Térkép</a>
     </nav>
+
+    <a class="btn btn-primary btn-sm nav-cta" routerLink="/explore">Térkép megnyitása <span aria-hidden="true">→</span></a>
+
+    <button
+      type="button"
+      class="menu-btn"
+      [attr.aria-expanded]="menuOpen"
+      aria-controls="mobil-menu"
+      (click)="menuOpen = !menuOpen"
+    >
+      <span class="sr-only">{{ menuOpen ? 'Menü bezárása' : 'Menü megnyitása' }}</span>
+      <span class="burger" [class.open]="menuOpen" aria-hidden="true"><i></i><i></i><i></i></span>
+    </button>
   </div>
+
+  <nav id="mobil-menu" class="nav-mobile" [class.open]="menuOpen" aria-label="Mobil menü" [attr.hidden]="menuOpen ? null : ''">
+    <a href="#kiemelt" (click)="scrollTo('kiemelt', $event)">Kiemelt helyek</a>
+    <a href="#kategoriak" (click)="scrollTo('kategoriak', $event)">Kategóriák</a>
+    <a href="#hogyan" (click)="scrollTo('hogyan', $event)">Hogyan működik?</a>
+    <a class="btn btn-primary" routerLink="/explore" (click)="menuOpen = false">Térkép megnyitása <span aria-hidden="true">→</span></a>
+  </nav>
 </header>
 
 <main id="tartalom" tabindex="-1">
   <!-- HERO -->
   <section class="hero" aria-labelledby="hero-title">
     <div class="hero-bg" aria-hidden="true">
-      <img *ngIf="!heroImageFailed" [src]="hero.image" alt="" (error)="heroImageFailed = true" fetchpriority="high" />
+      <img
+        *ngIf="!failedImages.has('hero')"
+        [src]="hero.src"
+        [attr.srcset]="hero.srcset"
+        sizes="100vw"
+        alt=""
+        fetchpriority="high"
+        (error)="failedImages.add('hero')"
+      />
     </div>
+
     <div class="wrap hero-grid">
       <div class="hero-copy">
         <p class="eyebrow">Térképalapú felfedezőplatform</p>
@@ -27,70 +62,102 @@
           egyetlen térképen.
         </p>
         <div class="cta-row">
-          <a class="btn btn-primary" routerLink="/explore">Felfedezés indítása</a>
+          <a class="btn btn-primary" routerLink="/explore">Felfedezés indítása <span aria-hidden="true">→</span></a>
           <a class="btn btn-ghost" href="#hogyan" (click)="scrollTo('hogyan', $event)">Hogyan működik?</a>
         </div>
-        <ul class="facts" *ngIf="countyCount !== null" aria-label="Az adatokról">
-          <li><strong>{{ countyCount }}</strong> vármegye valós határa betöltve</li>
-          <li>Hivatalos közigazgatási adatok (CC BY 4.0)</li>
-        </ul>
-      </div>
-      <div class="hero-art">
-        <app-county-art (loaded)="onCountiesLoaded($event)" />
-      </div>
-    </div>
-  </section>
 
-  <!-- FEATURED -->
-  <section id="kiemelt" class="section featured" aria-labelledby="featured-title" tabindex="-1">
-    <div class="wrap">
-      <div class="section-head reveal">
-        <p class="eyebrow">Kiemelt felfedezések</p>
-        <h2 id="featured-title">Helyek, amelyekért érdemes elindulni</h2>
+        <div class="facts">
+          <p class="fact-county" *ngIf="countyCount !== null"><strong>{{ countyCount }}</strong> vármegye valós határa betöltve</p>
+          <ul class="themes" aria-label="Témák">
+            <li>Természeti élmények</li>
+            <li>Események</li>
+            <li>Helyi ízek</li>
+          </ul>
+        </div>
       </div>
-      <div class="cards">
-        <article class="card reveal" *ngFor="let d of discoveries; let i = index" [class.card-wide]="i === 0">
-          <div class="card-media" [style.--fallback]="'linear-gradient(135deg,#1b2b22,#0e1a14)'">
-            <img
-              *ngIf="!failedImages.has(d.key)"
-              [src]="d.image"
-              [alt]="d.alt"
-              loading="lazy"
-              width="1600"
-              height="1000"
-              (error)="failedImages.add(d.key)"
-            />
-          </div>
-          <div class="card-body">
-            <p class="card-region">{{ d.region }}</p>
-            <h3>
-              <a routerLink="/explore" class="stretched">{{ d.place }}</a>
-            </h3>
-            <p class="card-text">{{ d.blurb }}</p>
-            <p class="card-credit">Fotó: {{ d.credit.author }} · {{ d.credit.license }}</p>
-          </div>
-        </article>
-      </div>
+
+      <aside class="map-panel" aria-label="Vármegyetérkép">
+        <nav class="panel-chips" aria-label="Kategóriák a térképen">
+          <a *ngFor="let c of categories" routerLink="/explore" [queryParams]="{ category: c.key }">{{ c.name }}</a>
+        </nav>
+        <app-county-art (loaded)="onCountiesLoaded($event)" />
+      </aside>
     </div>
+
+    <p class="hero-credit">
+      Háttér: Lánchíd éjjel, <a [href]="hero.credit.source" target="_blank" rel="noopener">{{ hero.credit.author }}</a> · {{ hero.credit.license }}
+    </p>
   </section>
 
   <!-- CATEGORIES -->
   <section id="kategoriak" class="section categories" aria-labelledby="cat-title" tabindex="-1">
     <div class="wrap">
       <div class="section-head reveal">
-        <p class="eyebrow">Böngéssz témák szerint</p>
-        <h2 id="cat-title">Mit keresel ma?</h2>
+        <p class="eyebrow">Felfedezési kategóriák</p>
+        <h2 id="cat-title">Válassz élményt, és indulj útnak</h2>
       </div>
-      <ul class="cat-list">
-        <li class="reveal" *ngFor="let c of categories; let i = index">
-          <a routerLink="/explore" [queryParams]="{ category: c.key }">
-            <span class="cat-index" aria-hidden="true">{{ i + 1 < 10 ? '0' + (i + 1) : i + 1 }}</span>
-            <span class="cat-name">{{ c.name }}</span>
-            <span class="cat-text">{{ c.text }}</span>
+      <ul class="cat-grid">
+        <li class="reveal" *ngFor="let c of categories">
+          <a class="cat-card" routerLink="/explore" [queryParams]="{ category: c.key }">
+            <img
+              *ngIf="!failedImages.has('cat-' + c.key)"
+              [src]="c.picture.src"
+              [attr.srcset]="c.picture.srcset"
+              sizes="(max-width: 640px) 90vw, (max-width: 1100px) 45vw, 20vw"
+              [alt]="c.picture.alt"
+              loading="lazy"
+              width="800"
+              height="600"
+              (error)="failedImages.add('cat-' + c.key)"
+            />
+            <span class="cat-body">
+              <span class="cat-name">{{ c.name }}</span>
+              <span class="cat-text">{{ c.text }}</span>
+            </span>
             <span class="cat-arrow" aria-hidden="true">→</span>
           </a>
         </li>
       </ul>
+    </div>
+  </section>
+
+  <!-- INSPIRATION -->
+  <section id="kiemelt" class="section featured" aria-labelledby="featured-title" tabindex="-1">
+    <div class="wrap">
+      <div class="section-head reveal">
+        <p class="eyebrow">Kiemelt helyek</p>
+        <h2 id="featured-title">Inspiráció a következő utadhoz</h2>
+        <p class="lead small">
+          Szerkesztői ötletek, nem ajánlatok és nem foglalható programok. A kártyák a térképen az adott kategóriát vagy
+          vármegyét nyitják meg; csak a ténylegesen feltöltött helyek jelennek meg.
+        </p>
+      </div>
+      <div class="cards">
+        <article class="card reveal" *ngFor="let d of inspirations; let i = index" [class.card-wide]="i === 0">
+          <div class="card-media">
+            <img
+              *ngIf="!failedImages.has(d.key)"
+              [src]="d.picture.src"
+              [attr.srcset]="d.picture.srcset"
+              sizes="(max-width: 640px) 94vw, (max-width: 1100px) 48vw, 32vw"
+              [alt]="d.picture.alt"
+              loading="lazy"
+              width="800"
+              height="500"
+              (error)="failedImages.add(d.key)"
+            />
+            <span class="badge">Szerkesztői inspiráció</span>
+          </div>
+          <div class="card-body">
+            <h3><a class="stretched" routerLink="/explore" [queryParams]="d.query">{{ d.title }}</a></h3>
+            <p class="card-text">{{ d.text }}</p>
+            <p class="card-credit">
+              Fotó: {{ d.picture.credit.author }} · {{ d.picture.credit.license }}
+              <ng-container *ngIf="d.illustrative"> · illusztráció, nem magyarországi helyszín</ng-container>
+            </p>
+          </div>
+        </article>
+      </div>
     </div>
   </section>
 
@@ -122,7 +189,7 @@
           döntöd el, merre indulsz.
         </p>
       </div>
-      <a class="btn btn-primary btn-lg" routerLink="/explore">Térkép megnyitása</a>
+      <a class="btn btn-primary btn-lg" routerLink="/explore">Térkép megnyitása <span aria-hidden="true">→</span></a>
     </div>
   </section>
 </main>
@@ -131,11 +198,12 @@
   <div class="wrap">
     <div class="foot-top">
       <div>
-        <p class="brand">Momap</p>
+        <p class="brand foot-brand">Momap</p>
         <p class="foot-note">Magyarország felfedezője: helyek, programok és élmények térképen.</p>
       </div>
       <nav aria-label="Lábléc menü">
         <a routerLink="/explore">Térkép</a>
+        <a href="#kategoriak" (click)="scrollTo('kategoriak', $event)">Kategóriák</a>
         <a href="#kiemelt" (click)="scrollTo('kiemelt', $event)">Kiemelt helyek</a>
         <a href="#hogyan" (click)="scrollTo('hogyan', $event)">Hogyan működik?</a>
       </nav>
@@ -147,7 +215,7 @@
         <li>
           Térképadatok és alaptérkép: ©
           <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap közreműködők</a>
-          (ODbL).
+          (ODbL). A jelenlegi csempeszolgáltató csak fejlesztési célra használható.
         </li>
         <li>
           Vármegyehatárok: a Lechner Tudásközpont adatai alapján, módosítva (vetületi átszámítás, egyszerűsített
@@ -156,13 +224,12 @@
         </li>
         <li>
           Fotók (Wikimedia Commons):
-          <ng-container *ngFor="let d of discoveries; let last = last">
-            <a [href]="d.credit.source" target="_blank" rel="noopener">{{ d.place }}</a> – {{ d.credit.author }},
-            <a *ngIf="d.credit.licenseUrl; else plainLicense" [href]="d.credit.licenseUrl" target="_blank" rel="noopener">{{ d.credit.license }}</a>
-            <ng-template #plainLicense>{{ d.credit.license }}</ng-template>;
+          <ng-container *ngFor="let c of credits">
+            <a [href]="c.credit.source" target="_blank" rel="noopener">{{ c.label }}</a> – {{ c.credit.author }},
+            <a *ngIf="c.credit.licenseUrl; else plainLicense" [href]="c.credit.licenseUrl" target="_blank" rel="noopener">{{ c.credit.license }}</a>
+            <ng-template #plainLicense>{{ c.credit.license }}</ng-template>;
           </ng-container>
-          <a [href]="hero.credit.source" target="_blank" rel="noopener">Lánchíd</a> – {{ hero.credit.author }},
-          <a [href]="hero.credit.licenseUrl" target="_blank" rel="noopener">{{ hero.credit.license }}</a>.
+          A hőlégballonos és a quados fotó nem magyarországi helyszínt mutat, csak illusztráció.
         </li>
       </ul>
     </div>

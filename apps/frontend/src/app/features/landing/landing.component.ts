@@ -1,8 +1,8 @@
-import { AfterViewInit, Component, ElementRef, OnDestroy } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, HostListener, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { CountyArtComponent } from './county-art.component';
-import { CATEGORIES, DISCOVERIES, HERO_IMAGE, STEPS } from './landing-content';
+import { ALL_CREDITS, CATEGORIES, HERO, INSPIRATIONS, STEPS } from './landing-content';
 
 @Component({
   selector: 'app-landing',
@@ -12,15 +12,16 @@ import { CATEGORIES, DISCOVERIES, HERO_IMAGE, STEPS } from './landing-content';
   styleUrls: ['./landing.component.scss'],
 })
 export class LandingComponent implements AfterViewInit, OnDestroy {
-  readonly hero = HERO_IMAGE;
-  readonly discoveries = DISCOVERIES;
+  readonly hero = HERO;
   readonly categories = CATEGORIES;
+  readonly inspirations = INSPIRATIONS;
   readonly steps = STEPS;
+  readonly credits = ALL_CREDITS;
   readonly year = new Date().getFullYear();
 
   /** Number of counties actually returned by the API; null until known (nothing is shown if it fails). */
   countyCount: number | null = null;
-  heroImageFailed = false;
+  menuOpen = false;
   failedImages = new Set<string>();
 
   private observer?: IntersectionObserver;
@@ -51,12 +52,18 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
     this.observer?.disconnect();
   }
 
+  @HostListener('document:keydown.escape')
+  closeMenu() {
+    this.menuOpen = false;
+  }
+
   onCountiesLoaded(n: number) {
     this.countyCount = n > 0 ? n : null;
   }
 
   scrollTo(id: string, event: Event) {
     event.preventDefault();
+    this.menuOpen = false;
     const target = document.getElementById(id);
     if (!target) return;
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;

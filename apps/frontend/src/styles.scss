@@ -9,11 +9,49 @@
 html, body {
   height: 100%;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-  background: #fff;
-  color: #333;
+  background: #070b09;
+  color: #f2efe6;
 }
 
 app-root {
   display: block;
   height: 100%;
+}
+
+/* ---- map POI markers (DOM elements created by MapService, so the styles live here) ---- */
+.mm-marker {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px;
+  border: 1.5px solid rgba(242, 239, 230, 0.9);
+  border-radius: 999px;
+  background: #0d1712;
+  color: #f2efe6;
+  font: 600 12px/1 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+  transition: transform 0.15s ease, background 0.15s ease, color 0.15s ease;
+
+  &:focus-visible { outline: 2px solid #c6f05a; outline-offset: 2px; }
+
+  /* shapes differ by category so the type never depends on colour alone */
+  .mm-dot { display: block; width: 12px; height: 12px; background: #c6f05a; border-radius: 50%; flex: none; }
+  .mm-label { display: none; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 6px; }
+
+  &.mm-cat-restaurant .mm-dot { background: #ff9f5a; border-radius: 2px; }
+  &.mm-cat-accommodation .mm-dot { background: #7dd3fc; border-radius: 2px; transform: rotate(45deg) scale(0.85); }
+  &.mm-cat-event .mm-dot { background: #f472b6; border-radius: 0; clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  &.mm-cat-nature .mm-dot { background: #6ee7a8; border-radius: 50% 0 50% 0; }
+
+  &.is-hover, &.is-selected { transform: scale(1.12); }
+  &.is-selected { background: #c6f05a; color: #070b09; border-color: #070b09; .mm-dot { box-shadow: 0 0 0 2px #070b09; } }
+  &.is-hover { border-color: #c6f05a; }
+  &.is-hover .mm-label, &.is-selected .mm-label { display: inline; }
+}
+.mm-labels .mm-marker .mm-label { display: inline; }
+.maplibregl-map:not(.mm-labels) .mm-marker:not(.is-hover):not(.is-selected) { padding: 5px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .mm-marker { transition: none; }
 }

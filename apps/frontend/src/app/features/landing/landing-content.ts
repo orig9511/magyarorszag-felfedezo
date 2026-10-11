@@ -5,107 +5,198 @@ export interface ImageCredit {
   source: string; // Wikimedia Commons file page
 }
 
-export interface Discovery {
-  key: string;
-  image: string;
+/** Local responsive image: files are src/assets/images/<key>-<width>.jpg. */
+export interface Picture {
+  src: string;
+  srcset: string;
   alt: string;
-  place: string;
-  region: string;
-  blurb: string;
   credit: ImageCredit;
 }
 
 const commons = (file: string) => `https://commons.wikimedia.org/wiki/File:${encodeURIComponent(file.replace(/ /g, '_'))}`;
 
-// Photos are stored locally in src/assets/images (1600 px renditions from Wikimedia Commons).
-export const DISCOVERIES: Discovery[] = [
+const pic = (key: string, widths: [number, number], alt: string, credit: ImageCredit): Picture => ({
+  src: `assets/images/${key}-${widths[0]}.jpg`,
+  srcset: widths.map((w) => `assets/images/${key}-${w}.jpg ${w}w`).join(', '),
+  alt,
+  credit,
+});
+
+const BY_SA_3 = 'https://creativecommons.org/licenses/by-sa/3.0';
+const BY_SA_4 = 'https://creativecommons.org/licenses/by-sa/4.0/';
+const CC0 = 'https://creativecommons.org/publicdomain/zero/1.0/';
+
+export const HERO: Picture = pic('hero', [1200, 2400], '', {
+  author: 'Wilfredor',
+  license: 'CC0',
+  licenseUrl: CC0,
+  source: commons('Széchenyi Chain Bridge in Budapest at night.jpg'),
+});
+
+export const CATEGORIES: {
+  key: string;
+  name: string;
+  text: string;
+  picture: Picture;
+}[] = [
   {
-    key: 'debrecen',
-    image: 'assets/images/debrecen.jpg',
-    alt: 'A debreceni Református Nagytemplom sárga homlokzata két toronnyal',
-    place: 'Debrecen',
-    region: 'Hajdú-Bihar vármegye',
-    blurb: 'A Nagytemplom a város jelképe, a magyar reformáció egyik legfontosabb helyszíne.',
-    credit: {
+    key: 'attraction',
+    name: 'Látnivalók',
+    text: 'Kastélyok, múzeumok, városok',
+    picture: pic('debrecen', [800, 1600], 'A debreceni Református Nagytemplom két tornyos, sárga homlokzata', {
       author: 'Pudelek (Marcin Szala)',
       license: 'CC BY-SA 3.0',
-      licenseUrl: 'https://creativecommons.org/licenses/by-sa/3.0',
+      licenseUrl: BY_SA_3,
       source: commons('Debrecen - Protestant Great Church.JPG'),
-    },
+    }),
+  },
+  {
+    key: 'restaurant',
+    name: 'Éttermek',
+    text: 'Helyi ízek, különleges helyek',
+    picture: pic('langos', [800, 1600], 'Sajtos-tejfölös lángos', {
+      author: 'sikeri',
+      license: 'CC BY-SA 4.0',
+      licenseUrl: BY_SA_4,
+      source: commons('Langos Eger Hungary.jpg'),
+    }),
+  },
+  {
+    key: 'accommodation',
+    name: 'Szállások',
+    text: 'Hotelek, vendégházak, apartmanok',
+    picture: pic('hotel', [800, 1600], 'Kétágyas szállodai szoba egy magyarországi szállodában', {
+      author: 'Hotel Makár (Wikimedia Commons)',
+      license: 'CC BY-SA 3.0',
+      licenseUrl: BY_SA_3,
+      source: commons('Hotel Makár, Pécs, Double room -central-superior - panoramio.jpg'),
+    }),
+  },
+  {
+    key: 'event',
+    name: 'Események',
+    text: 'Fesztiválok, koncertek, programok',
+    picture: pic('sziget', [800, 1600], 'Fesztiválközönség a színpad előtt a Szigeten', {
+      author: 'Derzsi Elekes Andor',
+      license: 'CC BY-SA 4.0',
+      licenseUrl: BY_SA_4,
+      source: commons('Interpol (NYC) Sziget 2011 (1).JPG'),
+    }),
+  },
+  {
+    key: 'nature',
+    name: 'Természet',
+    text: 'Túrázás, vízpartok, szabadtéri élmények',
+    picture: pic('hortobagy', [800, 1600], 'Végtelen zöld puszta a Hortobágyi Nemzeti Parkban', {
+      author: 'Krzysztof Ziarnek, Kenraiz',
+      license: 'CC BY-SA 4.0',
+      licenseUrl: BY_SA_4,
+      source: commons('Hortobágy National Park kz05.jpg'),
+    }),
+  },
+];
+
+/** Editorial inspiration only: these are NOT database records, offers or bookable experiences. */
+export interface Inspiration {
+  key: string;
+  title: string;
+  text: string;
+  /** Explorer filter this card opens (existing query parameters only). */
+  query: { category?: string; county?: string };
+  /** True when the photo is not from Hungary (shown in the caption). */
+  illustrative: boolean;
+  picture: Picture;
+}
+
+export const INSPIRATIONS: Inspiration[] = [
+  {
+    key: 'balloon',
+    title: 'Hőlégballonozás',
+    text: 'Reggeli vagy esti repülés: a táj egészen más szemszögből.',
+    query: { category: 'nature' },
+    illustrative: true,
+    picture: pic('balloon', [800, 1600], 'Izzó hőlégballonok éjszakai felfújás közben', {
+      author: 'Frank Schulenburg',
+      license: 'CC BY-SA 3.0',
+      licenseUrl: BY_SA_3,
+      source: commons('Dawn Patrol.jpg'),
+    }),
+  },
+  {
+    key: 'quad',
+    title: 'Quadozás és terepjárás',
+    text: 'Terepen töltött aktív nap, vezetett túrákkal.',
+    query: { category: 'nature' },
+    illustrative: true,
+    picture: pic('quad', [800, 1600], 'Piros quadok egy füves tisztáson', {
+      author: 'Ossewa',
+      license: 'CC BY 4.0',
+      licenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
+      source: commons('Quad Bikes Groot Marico.jpg'),
+    }),
+  },
+  {
+    key: 'hiking',
+    title: 'Erdők és túraútvonalak',
+    text: 'Zöldellő erdők, ösvények és csendes kilátók.',
+    query: { category: 'nature' },
+    illustrative: false,
+    picture: pic('hiking', [800, 1600], 'Ködös, zöld bükkerdő Perőcsény környékén', {
+      author: 'Kaszás Tibor',
+      license: 'CC BY-SA 3.0',
+      licenseUrl: BY_SA_3,
+      source: commons('Perőcsény, Hungary - panoramio (28).jpg'),
+    }),
+  },
+  {
+    key: 'visegrad',
+    title: 'Várak és a Dunakanyar',
+    text: 'Kilátás a visegrádi várból a Duna kanyarjára.',
+    query: { category: 'attraction' },
+    illustrative: false,
+    picture: pic('visegrad', [800, 1600], 'A Duna kanyarja a visegrádi várból nézve', {
+      author: 'Bahnfrend',
+      license: 'CC BY-SA 4.0',
+      licenseUrl: BY_SA_4,
+      source: commons('Views from Visegrád Castle, 2006 (01).jpg'),
+    }),
+  },
+  {
+    key: 'balaton',
+    title: 'Balaton és a vízpart',
+    text: 'Naplementék, part menti falvak, vízi programok.',
+    query: { county: 'veszprem' },
+    illustrative: false,
+    picture: pic('balaton', [800, 1600], 'Naplemente a Balaton fölött', {
+      author: 'Bazsi80',
+      license: 'Közkincs (public domain)',
+      source: commons('BalatonSunset.JPG'),
+    }),
   },
   {
     key: 'tokaj',
-    image: 'assets/images/tokaj.jpg',
-    alt: 'Szőlőültetvények a Tokaji-hegy lábánál',
-    place: 'Tokaj',
-    region: 'Borsod-Abaúj-Zemplén vármegye',
-    blurb: 'Szőlőhegyek és pincék a világörökségi borvidéken.',
-    credit: {
+    title: 'Tokaji borvidék',
+    text: 'Szőlőhegyek és pincék a világörökségi tájban.',
+    query: { county: 'borsod-abauj-zemplen' },
+    illustrative: false,
+    picture: pic('tokaj', [800, 1600], 'Szőlőültetvények a Tokaji-hegy lábánál', {
       author: 'Kressl',
       license: 'CC BY 3.0',
       licenseUrl: 'https://creativecommons.org/licenses/by/3.0',
       source: commons('Tokaj, Hungary 03944.JPG'),
-    },
+    }),
   },
-  {
-    key: 'balaton',
-    image: 'assets/images/balaton.jpg',
-    alt: 'Naplemente a Balaton fölött, a túlparton hegyek sziluettjével',
-    place: 'Balaton',
-    region: 'Veszprém és Somogy vármegye',
-    blurb: 'Közép-Európa legnagyobb tava, napnyugtákkal és part menti falvakkal.',
-    credit: { author: 'Bazsi80', license: 'Közkincs (public domain)', source: commons('BalatonSunset.JPG') },
-  },
-  {
-    key: 'parliament',
-    image: 'assets/images/parliament.jpg',
-    alt: 'A kivilágított Országház a Duna partján az esti kék órában',
-    place: 'Budapest',
-    region: 'Főváros',
-    blurb: 'Az Országház a Duna-parton, esti fényben.',
-    credit: {
-      author: 'Pierre Blaché',
-      license: 'CC0',
-      licenseUrl: 'https://creativecommons.org/publicdomain/zero/1.0/',
-      source: commons('Hungarian Parliament Building 2023-9.jpg'),
-    },
-  },
-  {
-    key: 'hortobagy',
-    image: 'assets/images/hortobagy.jpg',
-    alt: 'Végtelen zöld puszta a Hortobágyi Nemzeti Parkban',
-    place: 'Hortobágy',
-    region: 'Hajdú-Bihar vármegye',
-    blurb: 'A puszta nyugalma: a Hortobágyi Nemzeti Park nyílt tájai.',
-    credit: {
-      author: 'Krzysztof Ziarnek, Kenraiz',
-      license: 'CC BY-SA 4.0',
-      licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0/',
-      source: commons('Hortobágy National Park kz05.jpg'),
-    },
-  },
-];
-
-export const HERO_IMAGE = {
-  image: 'assets/images/chainbridge.jpg',
-  credit: {
-    author: 'Wilfredor',
-    license: 'CC0',
-    licenseUrl: 'https://creativecommons.org/publicdomain/zero/1.0/',
-    source: commons('Széchenyi Chain Bridge in Budapest at night.jpg'),
-  } as ImageCredit,
-};
-
-export const CATEGORIES = [
-  { key: 'attraction', name: 'Látnivalók', text: 'Műemlékek, múzeumok és helyek, amelyekért érdemes útra kelni.' },
-  { key: 'restaurant', name: 'Éttermek', text: 'Helyi ízek, borozók és vendéglők a térképen.' },
-  { key: 'accommodation', name: 'Szállások', text: 'Hol pihenj meg: szállások egy-egy régió szívében.' },
-  { key: 'event', name: 'Események', text: 'Fesztiválok, koncertek és programok dátum szerint szűrve.' },
-  { key: 'nature', name: 'Természet', text: 'Nemzeti parkok, tájak és kilátóhelyek.' },
 ];
 
 export const STEPS = [
   { title: 'Válassz vármegyét', text: 'A térkép Magyarország valódi közigazgatási határait mutatja. Egy kattintással egy régióra közelítesz.' },
-  { title: 'Fedezz fel szabadon', text: 'Nagyíts és mozgasd a térképet: a látnivalók és programok az éppen látható területhez igazodnak.' },
-  { title: 'Szűrj kategóriára', text: 'Látnivalók, éttermek, szállások vagy események: csak azt látod, amit keresel.' },
+  { title: 'Fedezz fel szabadon', text: 'Nagyíts és mozgasd a térképet: a találatok az éppen látható területhez igazodnak.' },
+  { title: 'Szűrj kategóriára', text: 'Látnivalók, éttermek, szállások, események vagy természet: csak azt látod, amit keresel.' },
+];
+
+/** Every credit shown in the footer. */
+export const ALL_CREDITS: { label: string; credit: ImageCredit }[] = [
+  { label: 'Lánchíd (háttérkép)', credit: HERO.credit },
+  ...CATEGORIES.map((c) => ({ label: c.name, credit: c.picture.credit })),
+  ...INSPIRATIONS.map((i) => ({ label: i.title, credit: i.picture.credit })),
 ];
