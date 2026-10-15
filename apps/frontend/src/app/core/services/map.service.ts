@@ -2,6 +2,8 @@
 import { BehaviorSubject, Subject } from 'rxjs';
 import maplibregl, { GeoJSONSource, LngLatBounds } from 'maplibre-gl';
 import { CountySummary } from './county.service';
+import { MapPins } from './map-pins';
+import { buildCountryMask } from './country-mask';
 import { MAP_STYLE } from '../config/map-style';
 import { HUNGARY_EXTENT, MapMode, MapPlace, SearchBounds, hasMapLocation, placeKey } from './discovery.model';
 
@@ -12,6 +14,7 @@ type LooseGeometry = { type: string; coordinates?: unknown };
 export class MapService {
   private map: maplibregl.Map | null = null;
   private loaded = false;
+  private pins?: MapPins;
   private resizeObserver?: ResizeObserver;
   private transitionEnd?: () => void;
   private pendingCounty?: { id: string; geometry: LooseGeometry };
@@ -20,6 +23,10 @@ export class MapService {
   private readonly modeSubject = new BehaviorSubject<MapMode>('overview');
   private readonly countyClickSubject = new Subject<string>();
   private readonly placeClickSubject = new Subject<string>();
+  private readonly detailsSubject = new Subject<string>();
+  private readonly popupClosedSubject = new Subject<void>();
+  readonly placeDetails$ = this.detailsSubject.asObservable();
+  readonly popupClosed$ = this.popupClosedSubject.asObservable();
   readonly viewportChange$ = this.viewportSubject.asObservable();
   readonly status$ = this.statusSubject.asObservable();
   readonly mode$ = this.modeSubject.asObservable();
@@ -87,13 +94,14 @@ export class MapService {
     this.setPlaces([]);
     this.map.fitBounds(HUNGARY_EXTENT, { padding: 34, duration: this.duration() });
   }
-  selectPlace(key: string | null) { this.setPlaceFilter('place-selected', key); }
-  highlightPlace(key: string | null) { this.setPlaceFilter('place-highlight', key); }
+  selectPlace(key: string | null) { this.pins?.selectPlace(key); }
+  highlightPlace(key: string | null) { this.pins?.highlightPlace(key); }
   flyTo(lng: number, lat: number, zoom: number) {
     if (this.modeSubject.value === 'roam') this.map?.flyTo({ center: [lng, lat], zoom, duration: this.duration() });
   }
   destroy() {
     this.cancelTransition(); this.resizeObserver?.disconnect(); this.resizeObserver = undefined;
+    this.pins?.destroy(); this.pins = undefined;
     this.map?.remove(); this.map = null; this.loaded = false; this.pendingCounty = undefined;
     this.places = []; this.placesSignature = ''; this.counties = []; this.modeSubject.next('overview'); this.statusSubject.next('destroyed');
   }
@@ -151,17 +159,10 @@ export class MapService {
     m.addLayer({ id: 'county-hover', type: 'line', source: 'counties', filter: ['==', ['get', 'id'], ''], paint: { 'line-color': '#e6ffac', 'line-width': 3 } });
     m.addSource('county-detail', { type: 'geojson', data: empty });
     m.addLayer({ id: 'county-detail', type: 'line', source: 'county-detail', paint: { 'line-color': '#c6f05a', 'line-width': 2.5 } });
-    m.addSource('places', { type: 'geojson', data: empty, cluster: true, clusterMaxZoom: 13, clusterRadius: 45, promoteId: 'key' });
-    m.addLayer({ id: 'place-clusters', type: 'circle', source: 'places', filter: ['has', 'point_count'], paint: {
-      'circle-color': '#c6f05a', 'circle-radius': ['step', ['get', 'point_count'], 17, 20, 23, 100, 29], 'circle-stroke-width': 2, 'circle-stroke-color': '#102017' } });
-    // HTML counts avoid relying on glyph endpoints in the current raster-only style.
-    m.addLayer({ id: 'places', type: 'circle', source: 'places', filter: ['!', ['has', 'point_count']], paint: {
-      'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, 4, 14, 7],
-      'circle-color': ['case', ['==', ['get', 'kind'], 'event'], '#93c7ff', '#c6f05a'], 'circle-stroke-color': '#0b130f', 'circle-stroke-width': 1.5 } });
-    for (const [id, radius] of [['place-highlight', 10], ['place-selected', 13]] as const) {
-      m.addLayer({ id, type: 'circle', source: 'places', filter: ['==', ['get', 'key'], ''], paint: {
-        'circle-radius': radius, 'circle-color': 'rgba(198,240,90,0.2)', 'circle-stroke-color': '#fff9e5', 'circle-stroke-width': 2 } });
-    }
+    m.addSource('places', { type: 'geojson', data: empty, cluster: true, clusterMaxZoom: 20, clusterRadius: 45, promoteId: 'key' });
+    // The worker still clusters/tiles the source; only visible source features get native pin buttons.
+    m.addLayer({ id: 'places', type: 'circle', source: 'places', paint: { 'circle-radius': 1, 'circle-opacity': 0 } });
+    this.pins = new MapPins(m, key => this.placeClickSubject.next(key), key => this.detailsSubject.next(key), () => this.popupClosedSubject.next());
     m.on('click', 'counties-fill', (e) => {
       if (this.modeSubject.value === 'roam') return;
       const f = e.features?.[0]; if (f?.properties?.['active']) this.countyClickSubject.next(String(f.properties['id']));
@@ -172,35 +173,29 @@ export class MapService {
       m.setFilter('county-hover', ['==', ['get', 'id'], enabled ? String(f?.properties?.['id']) : '']);
     });
     m.on('mouseleave', 'counties-fill', () => { m.getCanvas().style.cursor = ''; m.setFilter('county-hover', ['==', ['get', 'id'], '']); });
-    m.on('click', 'places', (e) => { const key = e.features?.[0]?.properties?.['key']; if (key) this.placeClickSubject.next(String(key)); });
-    m.on('click', 'place-clusters', async (e) => {
-      const f = e.features?.[0]; if (!f || f.geometry.type !== 'Point') return;
-      try {
-        const zoom = await this.source('places')!.getClusterExpansionZoom(Number(f.properties?.['cluster_id']));
-        if (this.map === m && this.modeSubject.value === 'roam') m.easeTo({ center: f.geometry.coordinates as [number, number], zoom, duration: this.duration() });
-      } catch { /* Source may have changed while a cluster was being expanded. */ }
-    });
   }
+
   private syncCounties() {
     const src = this.source('counties'); if (!src) return;
     const features: GeoJSON.Feature[] = this.counties.filter(c => c.displayGeometry).map(c => ({ type: 'Feature',
       geometry: c.displayGeometry as GeoJSON.Geometry, properties: { id: c.id, name: c.name, active: c.active } }));
     src.setData({ type: 'FeatureCollection', features });
-    const holes: number[][][] = [];
-    for (const feature of features) {
-      if (feature.geometry.type === 'MultiPolygon') holes.push(...feature.geometry.coordinates.map(p => p[0]));
-      else if (feature.geometry.type === 'Polygon') holes.push(feature.geometry.coordinates[0]);
+    try {
+      this.source('country-mask')?.setData(buildCountryMask(features.map(f => f.geometry)));
+    } catch {
+      // Never obscure valid geography if an upstream geometry cannot be processed.
+      this.source('country-mask')?.setData({ type: 'FeatureCollection', features: [] });
+      this.statusSubject.next('map error: A határmaszk geometriája nem dolgozható fel.');
     }
-    this.source('country-mask')?.setData({ type: 'FeatureCollection', features: holes.length ? [{ type: 'Feature',
-      geometry: { type: 'Polygon', coordinates: [[[-180,-85],[180,-85],[180,85],[-180,85],[-180,-85]], ...holes] }, properties: {} }] : [] });
   }
+
   private syncPlaces() {
+    this.pins?.setPlaces(this.places);
     this.source('places')?.setData({ type: 'FeatureCollection', features: this.places.filter(hasMapLocation).map(p => ({
       type: 'Feature', id: placeKey(p), geometry: { type: 'Point', coordinates: p.location!.coordinates },
       properties: { key: placeKey(p), kind: p.kind, title: p.title, category: p.category },
     })) });
   }
-  private setPlaceFilter(layer: string, key: string | null) { if (this.map?.getLayer(layer)) this.map.setFilter(layer, ['==', ['get', 'key'], key ?? '']); }
   private geometryBounds(geometry: LooseGeometry): LngLatBounds | null {
     const bounds = new LngLatBounds(); let found = false;
     const visit = (c: unknown): void => {

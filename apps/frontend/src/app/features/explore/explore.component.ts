@@ -1,5 +1,5 @@
 ﻿import { Component, OnInit, OnDestroy, AfterViewInit, ViewChild, ElementRef, HostListener } from '@angular/core';
-import { BehaviorSubject, Subject, EMPTY, catchError, combineLatest, distinctUntilChanged, filter, map, of, switchMap, takeUntil, tap, timer } from 'rxjs';
+import { BehaviorSubject, Subject, EMPTY, catchError, combineLatest, distinctUntilChanged, filter, map, of, switchMap, takeUntil, tap, timer, merge } from 'rxjs';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
@@ -11,13 +11,14 @@ import { MapMode, MapPlace, placeKey, viewportKey, visiblePlaces } from '../../c
 import { CATEGORIES } from '../landing/landing-content';
 import { ICONS } from '../../shared/icons/icons';
 import { CategoryIconComponent } from '../../shared/icons/category-icon.component';
+import { CATEGORY_VISUALS, categoryVisual } from '../../core/config/category-visuals';
 
 type DatePreset = 'any' | 'today' | 'tomorrow' | 'nextDays' | 'fixed';
 interface ExploreCard extends MapPlace {
   description?: string; sponsored?: boolean; source?: string; website?: string; address?: string; phone?: string;
   startTime?: Date; endTime?: Date; venue?: string; settlement?: string; countyId?: string; imageUrl?: string;
 }
-interface SearchResult { cards: ExploreCard[]; eventError: string; poiError: string }
+interface CachedCards { at: number; cards: ExploreCard[] }
 const plain = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
 
 @Component({
@@ -27,7 +28,10 @@ const plain = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').
 })
 export class ExploreComponent implements OnInit, AfterViewInit, OnDestroy {
   readonly icons = ICONS;
+  readonly visualFor = categoryVisual;
+  readonly categoryLegend = Object.values(CATEGORY_VISUALS);
   @ViewChild('mapElement', { static: true }) mapElement!: ElementRef<HTMLElement>;
+  @ViewChild('selectionDetails') selectionDetails?: ElementRef<HTMLElement>;
   readonly categoryOptions = CATEGORIES.filter(c => c.key !== 'event').map(c => ({ key: c.key, name: c.name }));
   mode: MapMode = 'overview';
   mapZoom = 7;
@@ -50,7 +54,13 @@ export class ExploreComponent implements OnInit, AfterViewInit, OnDestroy {
   private reload$ = new Subject<void>();
   private destroy$ = new Subject<void>();
   private counties$ = new BehaviorSubject<CountySummary[] | null>(null);
-  private cache = new Map<string, { at: number; value: SearchResult }>();
+  poiLoading = false;
+  eventLoading = false;
+  private poiCards: ExploreCard[] = [];
+  private eventCards: ExploreCard[] = [];
+  private eventReload$ = new Subject<void>();
+  private poiCache = new Map<string, CachedCards>();
+  private eventCache = new Map<string, CachedCards>();
 
   constructor(private mapService: MapService, private poiService: POIService, private eventService: EventService,
     private countyService: CountyService, private route: ActivatedRoute, private router: Router) {}
@@ -60,6 +70,18 @@ export class ExploreComponent implements OnInit, AfterViewInit, OnDestroy {
   get introAttractions() { return this.visibleCards.filter(c => c.kind === 'poi' && c.countyId === this.selectedCounty?.id).slice(0, 3); }
   get introEvents() { return this.visibleCards.filter(c => c.kind === 'event' && c.countyId === this.selectedCounty?.id && c.startTime && c.startTime.getTime() >= Date.now()).slice(0, 3); }
   get countyAttribution() { return this.selectedCounty?.attribution || this.counties.find(c => c.attribution)?.attribution || ''; }
+  get introductionPlaceState() {
+    if (this.contentMode === 'events') return 'A helyek megjelenítéséhez válaszd a Helyek vagy Minden módot.';
+    if (this.poiLoading) return 'Helyek betöltése…';
+    if (this.poiError) return this.poiError;
+    return this.selectedCategories.size ? 'A szűrt térképnézetben nincs megjeleníthető hely ebből a vármegyéből.' : 'A látható területen nincs megjeleníthető hely ebből a vármegyéből.';
+  }
+  get introductionEventState() {
+    if (this.contentMode === 'pois') return 'Az események megjelenítéséhez válts Minden vagy Események módra.';
+    if (this.eventLoading) return 'Események betöltése…';
+    if (this.eventError) return this.eventError;
+    return 'A választott időszakban és térképnézetben nincs megjeleníthető közelgő esemény ebből a vármegyéből.';
+  }
   categoryLabel(key: string) { return key === 'event' ? 'Esemény' : this.categoryOptions.find(c => c.key === key)?.name ?? key; }
   hasCategory(key: string) { return this.selectedCategories.has(key); }
   cardKey(_index: number, card: ExploreCard) { return placeKey(card); }
@@ -70,7 +92,7 @@ export class ExploreComponent implements OnInit, AfterViewInit, OnDestroy {
   ngOnInit() {
     this.mapService.mode$.pipe(takeUntil(this.destroy$)).subscribe(mode => {
       this.mode = mode;
-      if (mode !== 'roam') { this.visibleCards = []; this.selectedCard = undefined; this.mapService.setPlaces([]); }
+      if (mode !== 'roam') { this.poiCards = []; this.eventCards = []; this.poiLoading = false; this.eventLoading = false; this.visibleCards = []; this.selectedCard = undefined; this.mapService.setPlaces([]); }
       this.reload$.next();
     });
     this.mapService.status$.pipe(takeUntil(this.destroy$)).subscribe(status => {
@@ -109,42 +131,73 @@ export class ExploreComponent implements OnInit, AfterViewInit, OnDestroy {
     this.mapService.countyClick$.pipe(takeUntil(this.destroy$)).subscribe(id => this.chooseCounty(id));
     this.mapService.placeClick$.pipe(takeUntil(this.destroy$)).subscribe(key => {
       const card = this.visibleCards.find(c => placeKey(c) === key);
-      if (card) { this.selectCard(card, false); this.mobileView = 'list'; }
+      if (card) this.selectCard(card, false);
     });
-    // Outer switchMap cancels on movement/filter change immediately; only the new request waits 400 ms.
+    this.mapService.placeDetails$.pipe(takeUntil(this.destroy$)).subscribe(key => {
+      const card = this.visibleCards.find(c => placeKey(c) === key);
+      if (card) {
+        this.selectCard(card, false); this.mobileView = 'list';
+        requestAnimationFrame(() => this.selectionDetails?.nativeElement.focus({ preventScroll: true }));
+      }
+    });
+    this.mapService.popupClosed$.pipe(takeUntil(this.destroy$)).subscribe(() => { this.selectedCard = undefined; });
+    // Separate source streams: event latency and date changes cannot gate or restart POIs.
     this.reload$.pipe(switchMap(() => {
       if (this.mode !== 'roam' || this.moving || !this.viewport) return EMPTY;
       return timer(400).pipe(switchMap(() => {
         const v = { ...this.viewport! }, categories = [...this.selectedCategories].sort();
-        const key = viewportKey(v, [categories, this.contentMode, this.eventDatePreset, this.eventDaysWindow, this.eventFixedDate]);
-        this.poiState = 'loading';
-        const cached = this.cache.get(key);
-        if (cached && Date.now() - cached.at < 60000) return of(cached.value);
-        const pois = this.contentMode === 'events' ? of({ pois: [] as Poi[], error: '' }) :
-          this.poiService.getPOIsByViewport(v.minLat, v.maxLat, v.minLng, v.maxLng, categories.length ? categories : undefined).pipe(
-            map(pois => ({ pois, error: '' })), catchError(() => of({ pois: [] as Poi[], error: 'A helyek nem tölthetők be. Próbáld újra.' })));
-        const events = this.contentMode === 'pois' ? of({ events: [] as AppEvent[], error: '' }) :
-          this.eventService.getEventsByViewport(v.minLat, v.minLng, v.maxLat, v.maxLng, { days: this.getEventDays() }).pipe(
-            map(events => ({ events, error: '' })), catchError(() => of({ events: [] as AppEvent[], error: 'Az események nem tölthetők be. Próbáld újra.' })));
-        return combineLatest([pois, events]).pipe(map(([p, e]): SearchResult => {
-          const cards = visiblePlaces([...p.pois.map(poi => this.poiToCard(poi)),
-            ...this.filterEvents(e.events).map(event => this.eventToCard(event))], v)
-            .sort((a,b) => a.title.localeCompare(b.title, 'hu') || placeKey(a).localeCompare(placeKey(b)));
-          const result = { cards, eventError: e.error, poiError: p.error };
-          if (!p.error && !e.error) {
-            if (this.cache.size >= 20) this.cache.delete(this.cache.keys().next().value!);
-            this.cache.set(key, { at: Date.now(), value: result });
-          }
-          return result;
-        }));
+        this.poiError = ''; this.poiLoading = this.contentMode !== 'events';
+        if (this.contentMode === 'events') { this.poiCards = []; return of([] as ExploreCard[]); }
+        const key = viewportKey(v, categories);
+        const cached = this.poiCache.get(key);
+        if (cached && Date.now() - cached.at < 60000) return of(cached.cards);
+        this.poiCards = visiblePlaces(this.poiCards, v).filter(card => !categories.length || categories.includes(card.category));
+        this.publishResults();
+        return this.poiService.getPOIsByViewport(v.minLat, v.maxLat, v.minLng, v.maxLng, categories.length ? categories : undefined).pipe(
+          map(pois => visiblePlaces(pois.map(p => this.poiToCard(p)), v)),
+          tap(cards => this.cacheCards(this.poiCache, key, cards)),
+          catchError(() => { this.poiError = 'A helyek nem tölthetők be. Próbáld újra.'; return of([] as ExploreCard[]); }),
+        );
       }));
-    }), takeUntil(this.destroy$)).subscribe(result => {
-      this.visibleCards = result.cards; this.eventError = result.eventError; this.poiError = result.poiError;
-      this.resultLimit = 20; this.poiState = result.poiError && result.eventError ? 'error' : 'ready';
-      this.mapService.setPlaces(result.cards);
-      if (this.selectedCard) { this.selectedCard = result.cards.find(c => placeKey(c) === placeKey(this.selectedCard!)); this.mapService.selectPlace(this.selectedCard ? placeKey(this.selectedCard) : null); }
+    }), takeUntil(this.destroy$)).subscribe(cards => {
+      this.poiCards = cards; this.poiLoading = false; this.publishResults();
+    });
+    merge(this.reload$, this.eventReload$).pipe(switchMap(() => {
+      // Drop only event results as soon as their date/filter changes; leave POIs untouched.
+      this.eventCards = []; this.eventError = ''; this.eventLoading = false; this.publishResults();
+      if (this.mode !== 'roam' || this.moving || !this.viewport || this.contentMode === 'pois') return EMPTY;
+      this.eventLoading = true;
+      return timer(400).pipe(switchMap(() => {
+        const v = { ...this.viewport! };
+        const key = viewportKey(v, [this.eventDatePreset, this.eventDaysWindow, this.eventFixedDate]);
+        const cached = this.eventCache.get(key);
+        if (cached && Date.now() - cached.at < 60000) return of(cached.cards);
+        return this.eventService.getEventsByViewport(v.minLat, v.minLng, v.maxLat, v.maxLng, { days: this.getEventDays() }).pipe(
+          map(events => visiblePlaces(this.filterEvents(events).map(e => this.eventToCard(e)), v)),
+          tap(cards => this.cacheCards(this.eventCache, key, cards)),
+          catchError(() => { this.eventError = 'Az események nem tölthetők be. Próbáld újra.'; return of([] as ExploreCard[]); }),
+        );
+      }));
+    }), takeUntil(this.destroy$)).subscribe(cards => {
+      this.eventCards = cards; this.eventLoading = false; this.publishResults();
     });
   }
+  private cacheCards(cache: Map<string, CachedCards>, key: string, cards: ExploreCard[]) {
+    if (cache.size >= 20) cache.delete(cache.keys().next().value!);
+    cache.set(key, { at: Date.now(), cards });
+  }
+  private publishResults() {
+    const cards = this.mode === 'roam' ? [...this.poiCards, ...this.eventCards] : [];
+    this.visibleCards = cards.sort((a,b) => a.title.localeCompare(b.title, 'hu') || placeKey(a).localeCompare(placeKey(b)));
+    this.poiState = this.poiLoading || this.eventLoading ? 'loading' : this.poiError && this.eventError ? 'error' : 'ready';
+    this.mapService.setPlaces(this.visibleCards);
+    if (this.selectedCard) {
+      const key = placeKey(this.selectedCard);
+      this.selectedCard = this.visibleCards.find(c => placeKey(c) === key);
+      this.mapService.selectPlace(this.selectedCard ? key : null);
+    }
+  }
+
   ngAfterViewInit() { this.mapService.initializeMap(this.mapElement.nativeElement); }
   ngOnDestroy() { this.destroy$.next(); this.destroy$.complete(); this.mapService.destroy(); }
   @HostListener('document:keydown.escape') onEscape() { this.closeDetail(); }
@@ -165,7 +218,7 @@ export class ExploreComponent implements OnInit, AfterViewInit, OnDestroy {
   dismissIntroduction() { this.introVisible = false; }
   showWholeCountry() { this.selectedCounty = undefined; this.introVisible = false; this.closeDetail(); this.updateQuery({ county: null }); this.mobileView = 'map'; this.mapService.resetView(); }
   showMore() { this.resultLimit += 20; }
-  retry() { this.cache.clear(); this.reload$.next(); }
+  retry() { this.poiCache.clear(); this.eventCache.clear(); this.reload$.next(); }
   selectCard(card: ExploreCard, fly: boolean) {
     this.selectedCard = card; this.mapService.selectPlace(placeKey(card));
     const c = card.location?.coordinates;
@@ -174,9 +227,9 @@ export class ExploreComponent implements OnInit, AfterViewInit, OnDestroy {
   closeDetail() { this.selectedCard = undefined; this.mapService.selectPlace(null); }
   hoverCard(card: ExploreCard | null) { this.mapService.highlightPlace(card ? placeKey(card) : null); }
   setMobileView(view: 'map' | 'list') { this.mobileView = view; }
-  setEventDatePreset(preset: DatePreset) { this.eventDatePreset = preset; if (preset !== 'fixed') this.eventFixedDate = ''; this.reload$.next(); }
-  onEventDaysWindowChange(days: number) { this.eventDaysWindow = Math.max(1, Math.min(30, days)); this.eventDatePreset = 'nextDays'; this.reload$.next(); }
-  onFixedDateChange(value: string) { this.eventFixedDate = value; this.eventDatePreset = value ? 'fixed' : 'any'; this.reload$.next(); }
+  setEventDatePreset(preset: DatePreset) { this.eventDatePreset = preset; if (preset !== 'fixed') this.eventFixedDate = ''; this.eventReload$.next(); }
+  onEventDaysWindowChange(days: number) { this.eventDaysWindow = Math.max(1, Math.min(30, days)); this.eventDatePreset = 'nextDays'; this.eventReload$.next(); }
+  onFixedDateChange(value: string) { this.eventFixedDate = value; this.eventDatePreset = value ? 'fixed' : 'any'; this.eventReload$.next(); }
   private getEventDays() { return this.eventDatePreset === 'today' ? 1 : this.eventDatePreset === 'tomorrow' ? 2 : this.eventDatePreset === 'nextDays' ? this.eventDaysWindow : 60; }
   private dateOnly(date: Date) { return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Budapest', year: 'numeric', month: '2-digit', day: '2-digit' }).format(date); }
   private filterEvents(events: AppEvent[]) {

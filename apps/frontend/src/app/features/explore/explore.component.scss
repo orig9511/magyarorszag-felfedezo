@@ -158,3 +158,20 @@ button:focus-visible, a:focus-visible { outline: 2px solid $lime; outline-offset
 .dot { height: 8px; width: 8px; border-radius: 50%; display: inline-block; }.poi-dot { background: $lime; }.event-dot { background: #93c7ff; }
 .notice { white-space: normal; margin-bottom: .75rem; }
 @media (max-width: 900px) { .results { padding-bottom: 6rem; } .map-legend { bottom: 1.6rem; font-size: .65rem; } .overview-badge { width: max-content; max-width: 80%; } }
+/* Refined explorer layout: the map always owns its popup; detailed content lives in the sidebar. */
+.split { grid-template-columns: clamp(20rem, 31vw, 27rem) minmax(0,1fr); }
+.results { min-width: 0; scrollbar-gutter: stable; padding: 1rem 1.1rem 2rem; }
+.poi { grid-template-columns: 3rem minmax(0,1fr); gap: .75rem; }
+.thumb { color: var(--category-color, #cbd3dd); background: transparent; aspect-ratio: auto; min-height: 3rem; .ph { color: inherit; opacity: 1; } }
+.poi.is-selected { border-color: var(--category-color); box-shadow: inset 3px 0 0 var(--category-color); }
+.poi .cat { color: var(--category-color, #cbd3dd); }
+.selection-details { position: relative; padding: 1rem; margin-bottom: 1rem; border: 1px solid $line; border-radius: 10px; background: $surface;
+  h2 { font-family: $serif; font-weight: 400; font-size: 1.5rem; padding-right: 2rem; margin: .5rem 0; } p { font-size: .9rem; line-height: 1.5; }
+  .close { position: absolute; top: .3rem; right: .3rem; width: 44px; height: 44px; border: 0; background: transparent; font-size: 1.6rem; cursor: pointer; }
+  dl { margin: .75rem 0; font-size: .85rem; } dt { color: $muted; margin-top: .5rem; } dd { margin: .2rem 0; } a { color: $lime; } }
+.map-legend { pointer-events: auto; display: block; bottom: 2.8rem; left: .75rem; max-width: min(19rem,calc(100% - 4.5rem)); padding: .6rem .75rem; border: 1px solid $line; background: rgba(7,11,9,.96); font-size: .8rem;
+  summary { font-weight: 600; cursor: pointer; min-height: 1.5rem; } ul { list-style: none; display: grid; grid-template-columns: 1fr 1fr; gap: .45rem .8rem; padding: .5rem 0; } li { display: flex; align-items: center; gap: .45rem; } .legend-symbol { color: var(--category-color); display: inline-flex; } p { font-size: .72rem; color: $muted; line-height: 1.4; max-width: 17rem; } }
+@media (min-width: 901px) and (max-width: 1100px) { .split { grid-template-columns: 20rem minmax(0,1fr); } }
+@media (max-width: 900px) { .split { grid-template-columns: minmax(0,1fr); } .results { padding: 1rem 1rem 6rem; } .map-legend { bottom: 7.1rem; max-width: min(18rem,calc(100% - 4.5rem)); font-size: .75rem; } }
+@media (max-height: 600px) { .map-legend[open] ul { grid-template-columns: repeat(3,1fr); } .map-legend { max-width: min(26rem,calc(100% - 4.5rem)); } .map-legend p { display: none; } }
+.selection-details { border-left: 3px solid var(--category-color, #cbd3dd); }

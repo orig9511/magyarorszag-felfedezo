@@ -29,3 +29,29 @@ html:has(dialog[open]) {
   visibility: hidden;
   pointer-events: none;
 }
+/* Native map buttons retain MapLibre positioning; scale only their inner glyph. */
+.momap-pin { position: relative; width: 44px; height: 52px; padding: 0; border: 0; background: transparent; color: #101c17; cursor: pointer; overflow: visible; touch-action: manipulation; }
+.momap-pin-glyph { position: absolute; width: 40px; height: 48px; left: 2px; bottom: 0; transform-origin: 50% 100%; transition: transform 140ms ease; filter: drop-shadow(0 2px 3px rgba(0,0,0,.45)); }
+.momap-pin-glyph > svg { display: block; width: 40px; height: 48px; fill: var(--category-color); stroke: #17271e; stroke-width: 1.5; }
+.momap-pin-face { position: absolute; top: 7px; left: 9px; width: 22px; height: 22px; }
+.momap-pin-face svg { display: block; width: 22px; height: 22px; }
+.momap-pin:hover .momap-pin-glyph, .momap-pin:focus-visible .momap-pin-glyph, .momap-pin.is-highlighted .momap-pin-glyph { transform: translateY(-2px) scale(1.14); }
+.momap-pin.is-selected .momap-pin-glyph { transform: translateY(-2px) scale(1.18); filter: drop-shadow(0 0 4px white); }
+.momap-pin.is-selected .momap-pin-glyph > svg { stroke: white; stroke-width: 2.5; }
+.momap-pin:focus-visible, .momap-cluster:focus-visible { outline: 3px solid white; outline-offset: 4px; border-radius: 10px; z-index: 4; }
+.momap-pin.is-selected, .momap-pin:hover, .momap-pin:focus-visible { z-index: 3; }
+.momap-pin-tooltip { display: none; position: absolute; left: 50%; bottom: calc(100% + 6px); transform: translateX(-50%); width: max-content; max-width: 220px; padding: .5rem .65rem; color: #f2efe6; background: #101b17; border: 1px solid var(--category-color); border-radius: 6px; font: 500 13px/1.4 system-ui,sans-serif; text-align: left; pointer-events: none; }
+.momap-pin:focus-visible .momap-pin-tooltip, .momap-pin.is-highlighted .momap-pin-tooltip { display: block; }
+@media (hover:hover) { .momap-pin:hover .momap-pin-tooltip { display: block; } }
+.momap-cluster { width: 46px; height: 46px; border: 2px solid #f2efe6; border-radius: 18px; background: #c6f05a; color: #101b17; font: 700 14px system-ui,sans-serif; box-shadow: 0 2px 5px #0008; cursor: pointer; touch-action: manipulation; }
+.momap-place-popup { z-index: 5; }
+.momap-place-popup .maplibregl-popup-content { background: #101b17; color: #f2efe6; border-radius: 12px; border: 1px solid #506354; box-shadow: 0 8px 24px #0007; padding: 1rem; max-height: min(45vh,300px); overflow-y: auto; }
+.momap-place-popup .maplibregl-popup-close-button { color: #f2efe6; width: 44px; height: 44px; font-size: 24px; border-radius: 8px; }
+.momap-place-popup .maplibregl-popup-close-button:focus-visible, .momap-popup-body button:focus-visible { outline: 2px solid #f2efe6; outline-offset: 2px; }
+.momap-place-popup.maplibregl-popup-anchor-bottom .maplibregl-popup-tip { border-top-color: #101b17; }
+.momap-place-popup.maplibregl-popup-anchor-top .maplibregl-popup-tip { border-bottom-color: #101b17; }
+.momap-popup-body { font: 14px/1.5 system-ui,sans-serif; }
+.momap-popup-category { font-size: 12px; color: var(--category-color); padding-right: 1.7rem; }
+.momap-popup-body h2 { font-size: 17px; margin: .4rem 1rem .7rem 0; overflow-wrap: anywhere; }
+.momap-popup-body button { min-height: 44px; border: 1px solid var(--category-color); color: #f2efe6; padding: .5rem .7rem; background: transparent; border-radius: 6px; cursor: pointer; }
+@media (prefers-reduced-motion:reduce) { .momap-pin-glyph { transition: none; } }

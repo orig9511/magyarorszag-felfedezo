@@ -21,12 +21,14 @@ function load(relative, stubs = {}) {
 const model = load('apps/frontend/src/app/core/services/discovery.model.ts');
 const decorator = () => () => {};
 const angular = { Component: decorator, Injectable: decorator, ViewChild: decorator, HostListener: decorator };
+const iconFixture = [['path',{d:'M0 0L1 1'}]];
+const visuals = load('apps/frontend/src/app/core/config/category-visuals.ts', {'../../shared/icons/icons': {ICONS:Object.fromEntries(['Landmark','Utensils','BedDouble','Trees','CalendarDays','MapPin'].map(key=>[key,iconFixture]))}});
 const { ExploreComponent } = load('apps/frontend/src/app/features/explore/explore.component.ts', {
   '@angular/core': angular, '@angular/common': {}, '@angular/router': {}, 'lucide-angular': {},
   '../../core/services/discovery.model': model,
   '../../core/services/county.service': { countySlug: c => c.name.toLowerCase() },
   '../landing/landing-content': { CATEGORIES: [{ key: 'attraction', name: 'Látnivaló' }, { key: 'event', name: 'Esemény' }] },
-  '../../shared/icons/icons': { ICONS: {} }, '../../shared/icons/category-icon.component': {},
+  '../../core/config/category-visuals':visuals, '../../shared/icons/icons': { ICONS: {} }, '../../shared/icons/category-icon.component': {},
 });
 const bounds = { minLng: 16, minLat: 45, maxLng: 23, maxLat: 49, zoom: 9 };
 const poi = (id, lng = 19) => ({ id, name: id, category: 'attraction', countyId: 'county-a', location: { type: 'Point', coordinates: [lng,47] } });
@@ -34,7 +36,7 @@ function harness(poiRequest = () => rx.of([poi('place-a')]), eventRequest = () =
   const calls = { poi: [], event: [], places: [], selected: [] };
   const maps = {
     mode$: new rx.BehaviorSubject('overview'), status$: new rx.BehaviorSubject('ready'), viewportChange$: new rx.Subject(),
-    countyClick$: new rx.Subject(), placeClick$: new rx.Subject(), setCounties() {}, setPlaces(p) { calls.places.push(p); },
+    countyClick$: new rx.Subject(), placeClick$: new rx.Subject(), placeDetails$: new rx.Subject(), popupClosed$: new rx.Subject(), setCounties() {}, setPlaces(p) { calls.places.push(p); },
     selectPlace(k) { calls.selected.push(k); }, highlightPlace() {}, clearCountyDetail() {}, destroy() {}, flyTo() {},
   };
   const params = new rx.BehaviorSubject({ get: () => null });
@@ -130,7 +132,7 @@ global.ResizeObserver=class{observe(){}disconnect(){}};
 global.window={matchMedia:()=>({matches:false})};
 const { MapService }=load('apps/frontend/src/app/core/services/map.service.ts',{
   '@angular/core':angular,'maplibre-gl':{default:{Map:FakeMap,NavigationControl:class{}},LngLatBounds:FakeBounds},
-  '../config/map-style':{MAP_STYLE:{version:8,sources:{},layers:[]}},'./discovery.model':model,
+  '../config/map-style':{MAP_STYLE:{version:8,sources:{},layers:[]}},'./discovery.model':model, './country-mask':load('apps/frontend/src/app/core/services/country-mask.ts'), './map-pins':{MapPins:class{setPlaces(){}selectPlace(){}highlightPlace(){}destroy(){}}},
 });
 test('map locks all navigation and zoom buttons before county selection',()=>{
   const service=new MapService();service.initializeMap({});const m=FakeMap.last;
@@ -166,4 +168,133 @@ test('reduced-motion camera transitions still unlock without waiting for a timer
   global.window.matchMedia=()=>({matches:true});
   const service=new MapService(),modes=[];service.mode$.subscribe(mode=>modes.push(mode));service.initializeMap({});FakeMap.last.emit('style.load');
   service.showCountyDetail('a',{type:'MultiPolygon',coordinates:[[[[19,47],[20,47],[20,48],[19,47]]]]});assert.equal(modes.at(-1),'roam');service.destroy();global.window.matchMedia=()=>({matches:false});
+});
+
+test('POIs render without waiting for an event request that has not responded',()=>clock(s=>{
+  const h=harness(()=>rx.of([poi('date-independent')]),()=>rx.NEVER);h.roam();
+  s.schedule(()=>{assert.equal(h.component.visibleCards.filter(c=>c.kind==='poi').length,1);h.component.ngOnDestroy();},401);
+}));
+test('changing event date does not issue another POI request or remove its result',()=>clock(s=>{
+  const h=harness();h.roam();
+  s.schedule(()=>h.component.setEventDatePreset('today'),450);
+  s.schedule(()=>{assert.equal(h.calls.poi.length,1);assert.equal(h.calls.event.length,2);assert.equal(h.component.visibleCards.filter(c=>c.kind==='poi').length,1);h.component.ngOnDestroy();},851);
+}));
+test('places-only hides dates and date changes cannot refetch its POIs',()=>clock(s=>{
+  const h=harness();h.component.contentMode='pois';h.roam();assert.equal(h.component.showEventDateFilters,false);
+  s.schedule(()=>h.component.setEventDatePreset('today'),450);
+  s.schedule(()=>{assert.equal(h.calls.poi.length,1);assert.equal(h.calls.event.length,0);h.component.ngOnDestroy();},851);
+}));
+function insideRing(point,ring){let inside=false;for(let i=0,j=ring.length-1;i<ring.length;j=i++){
+ const a=ring[i],b=ring[j];if(((a[1]>point[1])!==(b[1]>point[1]))&&point[0]<(b[0]-a[0])*(point[1]-a[1])/(b[1]-a[1])+a[0])inside=!inside;
+}return inside;}
+function maskContains(geometry,point){const polys=geometry.type==='Polygon'?[geometry.coordinates]:geometry.coordinates;return polys.some(p=>insideRing(point,p[0])&&!p.slice(1).some(r=>insideRing(point,r)));}
+const rectangle=(a,b,c,d)=>[[a,b],[c,b],[c,d],[a,d],[a,b]];
+test('overlapping county exteriors are unioned before subtraction from the world mask',()=>{
+ const service=new MapService();service.initializeMap({});const m=FakeMap.last;m.emit('style.load');
+ service.setCounties([{id:'a',active:true,displayGeometry:{type:'Polygon',coordinates:[rectangle(0,0,2,2)]}},{id:'b',active:true,displayGeometry:{type:'MultiPolygon',coordinates:[[rectangle(1,0,3,2)]]}}]);
+ const g=m.getSource('country-mask').data.features[0].geometry;
+ assert.equal(maskContains(g,[1.5,1]),false,'overlapping Hungarian geography must remain unmasked');
+ assert.equal(maskContains(g,[4,1]),true); const polygons=g.type==='Polygon'?[g.coordinates]:g.coordinates; assert.equal(polygons.reduce((n,p)=>n+p.length-1,0),1,'overlapping rings must be dissolved into one coverage hole'); service.destroy();
+});
+test('a genuine polygon hole stays outside country coverage; winding is normalized',()=>{
+ const service=new MapService();service.initializeMap({});const m=FakeMap.last;m.emit('style.load');
+ service.setCounties([{id:'a',active:true,displayGeometry:{type:'Polygon',coordinates:[rectangle(0,0,3,3).reverse(),rectangle(1,1,2,2)]}}]);
+ const g=m.getSource('country-mask').data.features[0].geometry;
+ assert.equal(maskContains(g,[1.5,1.5]),true,'a genuine hole must not be invented as country land');
+ assert.equal(maskContains(g,[.5,.5]),false);service.destroy();
+});
+
+class FakeElement {
+  constructor(tag){this.tagName=tag.toUpperCase();this.children=[];this.attributes={};this.listeners={};this.properties={};this.textContent='';this.style={setProperty:(k,v)=>this.properties[k]=v};this.classes=new Set();this.classList={toggle:(key,on)=>on?this.classes.add(key):this.classes.delete(key),contains:key=>this.classes.has(key)};}
+  setAttribute(k,v){this.attributes[k]=String(v);} getAttribute(k){return this.attributes[k];}
+  appendChild(child){this.children.push(child);return child;} append(...children){children.forEach(c=>this.appendChild(c));}
+  addEventListener(type,callback){(this.listeners[type]??=[]).push(callback);}
+  fire(type,extra={}){for(const callback of this.listeners[type]||[])callback({stopPropagation(){},detail:1,...extra});}
+  querySelector(selector){const name=selector.slice(1);for(const child of this.children){if(child.className?.split(' ').includes(name))return child;const found=child.querySelector?.(selector);if(found)return found;}return null;}
+  contains(element){return this===element||this.children.some(c=>c.contains(element));}
+  focus(){global.document.activeElement=this;this.fire('focus');}
+}
+global.document={createElement:tag=>new FakeElement(tag),createElementNS:(_ns,tag)=>new FakeElement(tag),activeElement:null};
+let nextFrame=0;const frames=new Map();
+global.requestAnimationFrame=callback=>{frames.set(++nextFrame,callback);return nextFrame;};global.cancelAnimationFrame=id=>frames.delete(id);
+function flushPins(){const pending=[...frames.values()];frames.clear();pending.forEach(f=>f());}
+class FakeMarker{
+  static created=[];
+  constructor(options){this.options=options;this.removed=false;FakeMarker.created.push(this);}
+  setLngLat(position){this.position=position;return this;}addTo(map){this.map=map;return this;}remove(){this.removed=true;return this;}
+}
+class FakePopup{
+  static last;
+  constructor(options){this.options=options;this.open=false;this.listeners={};this.element=new FakeElement('div');const close=new FakeElement('button');close.className='maplibregl-popup-close-button';this.element.append(close);FakePopup.last=this;}
+  setLngLat(position){this.position=position;return this;}setDOMContent(content){this.content=content;this.element.append(content);return this;}addTo(map){this.open=true;return this;}
+  on(type,callback){this.listeners[type]=callback;return this;}getElement(){return this.element;}isOpen(){return this.open;}remove(){this.open=false;this.listeners.close?.();return this;}
+}
+const {MapPins,createPin}=load('apps/frontend/src/app/core/services/map-pins.ts',{
+  'maplibre-gl':{default:{Marker:FakeMarker,Popup:FakePopup}},'../config/category-visuals':visuals,'./discovery.model':model,
+});
+function pinHarness(places){
+ const calls={selected:[],details:[],closed:0,zoom:[]};const map=new FakeMap({});map.features=places.map(p=>({geometry:{type:'Point',coordinates:p.location.coordinates},properties:{key:model.placeKey(p)}}));
+ map.querySourceFeatures=()=>map.features;map.getBounds=()=>({contains:p=>p[0]>=16&&p[0]<=23&&p[1]>=45&&p[1]<=49});map.easeTo=options=>calls.zoom.push(options);
+ const renderer=new MapPins(map,key=>{calls.selected.push(key);renderer.selectPlace(key);},key=>calls.details.push(key),()=>calls.closed++);
+ renderer.setPlaces(places);flushPins();return{renderer,map,calls};
+}
+const pinPlace=(id,category='attraction')=>({...poi(id),kind:'poi',title:id,category});
+test('one category palette drives pins, event identity and safe fallback',()=>{
+ const place=pinPlace('a','restaurant'),v=visuals.categoryVisual(place);const button=createPin(place,()=>{},()=>{});
+ assert.equal(button.properties['--category-color'],v.color);assert.ok(button.getAttribute('aria-label').includes(v.label));
+ assert.equal(visuals.categoryVisual({...place,kind:'event'}),visuals.CATEGORY_VISUALS.event);
+ assert.equal(visuals.categoryVisual({...place,category:'__proto__'}),visuals.CATEGORY_VISUALS.other);
+});
+test('pin is a native accessible button with focus highlighting, selected state and tooltip',()=>{
+ const h=pinHarness([pinPlace('a')]);const pin=h.renderer.records.get('poi:a').button;
+ assert.equal(pin.tagName,'BUTTON');assert.equal(pin.type,'button');assert.equal(pin.getAttribute('aria-haspopup'),'dialog');assert.ok(pin.getAttribute('aria-describedby'));
+ pin.focus();assert.equal(pin.classList.contains('is-highlighted'),true);pin.fire('click',{detail:0});
+ assert.deepEqual(h.calls.selected,['poi:a']);assert.equal(pin.getAttribute('aria-pressed'),'true');
+ assert.equal(document.activeElement,FakePopup.last.getElement().querySelector('.maplibregl-popup-close-button'));h.renderer.destroy();
+});
+test('a touch-equivalent single click opens a coordinate-anchored popup without switching to a county',()=>{
+ const place=pinPlace('a');const h=pinHarness([place]);h.renderer.records.get('poi:a').button.fire('click');
+ const popup=FakePopup.last;assert.deepEqual(popup.position,place.location.coordinates);assert.equal(popup.options.anchor,undefined,'MapLibre must auto-anchor at viewport edges');assert.ok(popup.options.offset.bottom[1]<0);
+ assert.equal(popup.getElement().getAttribute('role'),'dialog');popup.content.children.at(-1).fire('click');assert.deepEqual(h.calls.details,['poi:a']);
+ popup.remove();assert.equal(h.calls.closed,1);assert.equal(h.renderer.records.get('poi:a').button.getAttribute('aria-pressed'),'false');h.renderer.destroy();
+});
+test('popup and tooltip text cannot interpret HTML from an API title',()=>{
+ const title='<img src=x onerror=alert(1)>';const h=pinHarness([pinPlace(title)]);h.renderer.selectPlace('poi:'+title);const popup=FakePopup.last;
+ assert.equal(popup.content.children.find(c=>c.tagName==='H2').textContent,title);assert.equal(popup.content.children.some(c=>c.tagName==='IMG'),false);h.renderer.destroy();
+});
+test('settled marker updates deduplicate tile copies, ignore offscreen features and reuse nodes',()=>{
+ const places=Array.from({length:200},(_,i)=>pinPlace('p'+i));const before=FakeMarker.created.length;const h=pinHarness(places);
+ h.map.features.push(h.map.features[0],{geometry:{type:'Point',coordinates:[0,0]},properties:{key:'poi:p0'}});h.renderer.sync();
+ assert.equal(h.renderer.records.size,200);assert.equal(FakeMarker.created.length-before,200);
+ h.renderer.highlightPlace('poi:p1');h.renderer.sync();assert.equal(FakeMarker.created.length-before,200);h.renderer.setPlaces([]);flushPins();assert.equal(h.renderer.records.size,0);h.renderer.destroy();
+});
+test('cluster buttons show counts; stale expansion cannot move the new dataset',async()=>{
+ const h=pinHarness([pinPlace('a')]);let resolve;h.map.sources.set('places',{getClusterExpansionZoom:()=>new Promise(r=>resolve=r)});
+ h.map.features=[{geometry:{type:'Point',coordinates:[19,47]},properties:{cluster:true,cluster_id:3,point_count:12}}];h.renderer.sync();
+ const cluster=[...h.renderer.records.values()][0].button;assert.equal(cluster.textContent,'12');assert.match(cluster.getAttribute('aria-label'),/12/);cluster.fire('click');
+ h.renderer.setPlaces([pinPlace('b')]);resolve(12);await Promise.resolve();assert.equal(h.calls.zoom.length,0);h.renderer.destroy();
+});
+test('closing an old popup when selecting another place cannot clear the new selection',()=>{
+ const h=pinHarness([pinPlace('a'),pinPlace('b')]);h.renderer.selectPlace('poi:a');h.renderer.selectPlace('poi:b');
+ assert.equal(h.calls.closed,0);assert.equal(h.renderer.records.get('poi:b').button.getAttribute('aria-pressed'),'true');h.renderer.destroy();
+});
+test('geometry mask preserves islands, closes cloned input rings and never mutates source geography',()=>{
+ const {buildCountryMask}=load('apps/frontend/src/app/core/services/country-mask.ts');
+ const geometry={type:'MultiPolygon',coordinates:[[rectangle(0,0,2,2).slice(0,-1)],[rectangle(3,0,4,1)]]};const snapshot=JSON.stringify(geometry);
+ const mask=buildCountryMask([geometry]);assert.equal(JSON.stringify(geometry),snapshot);assert.equal(maskContains(mask.features[0].geometry,[3.5,.5]),false);assert.equal(maskContains(mask.features[0].geometry,[2.5,.5]),true);
+});
+
+test('changing dates while POIs are in flight does not cancel or delay them',()=>clock(s=>{
+ let cancelledBeforeCompletion=0;const h=harness(()=>new rx.Observable(sub=>{let finished=false;const work=s.schedule(()=>{finished=true;sub.next([poi('unblocked')]);sub.complete();},800);return()=>{if(!finished)cancelledBeforeCompletion++;work.unsubscribe();};}),()=>rx.NEVER);h.roam();
+ s.schedule(()=>h.component.setEventDatePreset('today'),450);s.schedule(()=>h.component.setEventDatePreset('tomorrow'),600);
+ s.schedule(()=>{assert.equal(h.calls.poi.length,1);assert.equal(cancelledBeforeCompletion,0);assert.equal(h.component.visibleCards[0].id,'unblocked');h.component.ngOnDestroy();},1201);
+}));
+test('the country union fills an interior administrative hole when another county covers it',()=>{
+ const {buildCountryMask}=load('apps/frontend/src/app/core/services/country-mask.ts');const outer={type:'Polygon',coordinates:[rectangle(0,0,4,4),rectangle(1,1,2,2).reverse()]};const inner={type:'MultiPolygon',coordinates:[[rectangle(1,1,2,2)]]};
+ const mask=buildCountryMask([outer,inner]);assert.equal(maskContains(mask.features[0].geometry,[1.5,1.5]),false);assert.equal(maskContains(mask.features[0].geometry,[4.5,2]),true);
+ for(const polygon of mask.features[0].geometry.coordinates){for(const [index,ring] of polygon.entries()){let twiceArea=0;for(let i=1;i<ring.length;i++)twiceArea+=ring[i-1][0]*ring[i][1]-ring[i][0]*ring[i-1][1];assert.ok(index===0?twiceArea>0:twiceArea<0,'GeoJSON output winding must be normalized');}}
+});
+test('pin category colors maintain readable dark pictograms',()=>{
+ const luminance=hex=>{const colors=hex.replace('#','').match(/../g).map(c=>parseInt(c,16)/255).map(c=>c<=.04045?c/12.92:((c+.055)/1.055)**2.4);return .2126*colors[0]+.7152*colors[1]+.0722*colors[2];};
+ const ink=luminance('#101c17');for(const entry of Object.values(visuals.CATEGORY_VISUALS))assert.ok((luminance(entry.color)+.05)/(ink+.05)>=4.5,entry.key+' must have at least 4.5:1 contrast');
 });

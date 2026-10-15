@@ -7,6 +7,13 @@
 
 ## Aktuális munkafázis és elsőbbség
 
+- [x] MAP-REFINE-001-DATE – POI/event várakozás és cache szétválasztva; dátumváltás csak eseményt kér újra, Places-only dátumkontroll rejtett. Reprodukált frontend-kapcsolási hibák regressziói PASS; az eredeti browser-látvány nem reprodukált.
+- [x] MAP-REFINE-001-MASK – Teljes Polygon/MultiPolygon unió és world-minus-coverage maszk, belső gyűrűk és szigetek megőrzésével; szintetikus és jelenlegi API-geometriás ellenőrzés PASS. GPU-látvány még UNVERIFIED.
+- [ ] MAP-REFINE-001-UX – PARTIAL: központi kategóriapaletta, hozzáférhető ikonos pinek/klasztergombok, ponthoz kötött popup, sidebar/legend/intro finomítás kész. 35 frontend-regressziós teszt és production build PASS; tényleges browser/touch/screen-reader elfogadás hátravan.
+- [ ] MAP-REFINE-001-API – JÓVÁHAGYÁSRA VÁR: az élő event viewport days=1 és days=7 esetén is 400-as számvalidációs hibát ad; a korábban feltárt SRID-eltérés is megvan. Backend módosítás nem történt, külön engedély szükséges.
+
+Aktuális bizonyítékok és korlátok: OUTPUT.md és docs/research/MAP-REFINE-001-findings.md. A 2026-10-15-i jelen kérés csak frontendfinomítást engedélyez; DB, séma, ingestion és backendadat változatlan.
+
 - [x] DB-001 – Read-only PostgreSQL-felmérés és biztonságos migrációs terv dokumentálva (2026-10-15); részletek: docs/outputs/DB-001.md. PG17.6 / 5433 / C:\Program Files\PostgreSQL\17\data; MOMAP-adatok a postgres adatbázisban, PostGIS 3.5.3. A mentések és backend futásidejű integráció nem igazoltak.
 - [ ] DB-001-MIGRATION – KÜLÖN JÓVÁHAGYÁSRA VÁR: cél D:\PostgreSQL\17\data; mentés és restore-próba, PEM-függőségek, karbantartási ablak, jogosultságok, adatellenőrzés és rollback szükséges. Migráció nem történt.
 
@@ -17,7 +24,7 @@ Az architektúra- és térképes audit elkészült a mostani hatókörben. A 202
 - [ ] MAP-SESSION-C–F – PARTIAL: frontend-megvalósítás kész, osztályszintű regressziós tesztekkel és production builddel; tényleges böngészős/mobilos és élő API-elfogadás hátravan. Részletek: OUTPUT.md.
 - [ ] MAP-SESSION-G – PARTIAL: build és 19 hálózat nélküli teszt PASS; böngészős hozzáférés elutasítva, UI/GPU/touch ellenőrzés BLOCKED.
 - [x] BACKEND-BUILD-001 – A két TS2353 hiba javítva; backend build és importlánc-regresszió PASS. Történeti jelentés: docs/outputs/BACKEND-BUILD-001.md.
-- [x] BACKEND-CONFIG-001 – Relatív .env miatt kimaradó DATABASE_URL és SCRAM jelszóhiba javítva: munkakönyvtártól független abszolút env-útvonalak, kötelező URL-ellenőrzés. Build és 5 teszt PASS; közvetlen read-only kapcsolat postgres:5433 PASS. Teljes Nest-integráció még UNVERIFIED; OUTPUT.md.
+- [x] BACKEND-CONFIG-001 – Relatív .env miatt kimaradó DATABASE_URL és SCRAM jelszóhiba javítva. Build és 5 teszt PASS; read-only kapcsolat postgres:5433 PASS. Történeti jelentés: docs/outputs/BACKEND-CONFIG-001.md.
 - [ ] MAP-BACKEND-001 – NYITOTT: event DTO számkonverzió, SRID=4326 viewport, többértékű kategória és dátumszemantika; az eventType fordítási hibák külön BACKEND-BUILD-001 feladatban megoldva. További végrehajtás külön jóváhagyást igényel.
 - [ ] MAP-DATA-001 – KÜLÖN ADAT/MIGRÁCIÓS TERV: 20 kanonikus régió, Budapest seed hivatkozásainak megőrzése/egyeztetése, provenance és entity/migration eltérés. Frontenden a HU-BP csak HU-BU jelenlétében rejtett, DB nem változott.
 
@@ -294,6 +301,14 @@ After every development task, provide:
 ---
 
 ## 8. DEVELOPMENT HISTORY
+
+### 2026-10-15 — MAP-REFINE-001
+
+- Frontend regressziós teszttel reprodukálva: a közös combineLatest visszatartotta a POI-t, amíg az eseménykérés nem válaszolt; a dátumváltás feleslegesen újrakérte a POI-t. Külön forrásstreamek és cache-ek javítják, a 400 ms debounce és azonnali cancel megmaradt.
+- Maszkgyökérok: külön county shell-ek mint átfedő lyukak, belső ringek elvesztése. Teljes geometriák uniója és különbség, bemeneti adatmódosítás nélkül. Új frontendfüggőség: polygon-clipping 0.15.7, licencek és két futásidejű függőség ellenőrizve, notices assetben megőrizve.
+- Ikonos, kategóriaszínű natív marker- és klasztergombok; közös palette, focus/hover/selected/tooltip, koordinátához kötött popup. Mobilon egy pin koppintása a térképen tart. Sidebar részletek, kompakt reszponzív szélesség, összecsukható legend és őszinte intro-üres állapotok.
+- 35 frontendteszt PASS; production build PASS, hash 98fc25ccbc3b9ac9. Éles POI GET 200/202 rekord; event GET 400 mindkét dátumablaknál. Browser/AT/touch/GPU vizsgálat nincs, a korábbi hozzáférési elutasítást nem kerültük meg.
+- Backend és scripts Git diffje üres; nem történt DB-, ingestion-, szolgáltatás- vagy backendadat-módosítás, deploy, commit vagy push.
 
 ### 2026-10-15 — BACKEND-CONFIG-001
 

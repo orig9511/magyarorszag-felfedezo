@@ -19,6 +19,7 @@
     "@angular/router": "^17.0.0",
     "lucide-angular": "^1.0.0",
     "maplibre-gl": "^4.0.1",
+    "polygon-clipping": "0.15.7",
     "rxjs": "^7.8.1",
     "tslib": "^2.6.2",
     "zone.js": "^0.14.2"
