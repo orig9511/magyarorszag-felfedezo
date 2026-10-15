@@ -23,3 +23,9 @@ app-root {
 html:has(dialog[open]) {
   overflow: hidden;
 }
+
+/* MapLibre updates its zoom buttons during camera animation; hide the controls until roam. */
+.momap-navigation-locked .maplibregl-ctrl-group {
+  visibility: hidden;
+  pointer-events: none;
+}

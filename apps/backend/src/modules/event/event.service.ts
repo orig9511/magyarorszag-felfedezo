@@ -1,8 +1,8 @@
-import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, MoreThan, LessThan, In } from 'typeorm';
-import { Event } from './event.entity';
-import { GetEventsDto } from './dto/get-events.dto';
+import { Injectable } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository, MoreThan, LessThan, In } from "typeorm";
+import { Event } from "./event.entity";
+import { GetEventsDto } from "./dto/get-events.dto";
 
 @Injectable()
 export class EventService {
@@ -25,32 +25,35 @@ export class EventService {
     toDate?: Date,
   ): Promise<Event[]> {
     let query = this.eventRepo
-      .createQueryBuilder('event')
-      .where('event.status = :status', { status: 'active' })
-      .andWhere(`ST_Intersects(event.location, ST_MakeBox2D(ST_Point(:minLon, :minLat), ST_Point(:maxLon, :maxLat)))`, {
-        minLat,
-        minLon,
-        maxLat,
-        maxLon,
-      });
+      .createQueryBuilder("event")
+      .where("event.status = :status", { status: "active" })
+      .andWhere(
+        `ST_Intersects(event.location, ST_MakeBox2D(ST_Point(:minLon, :minLat), ST_Point(:maxLon, :maxLat)))`,
+        {
+          minLat,
+          minLon,
+          maxLat,
+          maxLon,
+        },
+      );
 
     if (categories && categories.length > 0) {
-      query = query.andWhere('event.category IN (:...categories)', { categories });
+      query = query.andWhere("event.category IN (:categories)", { categories });
     }
 
     if (countyId) {
-      query = query.andWhere('event.countyId = :countyId', { countyId });
+      query = query.andWhere("event.countyId = :countyId", { countyId });
     }
 
     if (fromDate) {
-      query = query.andWhere('event.endTime >= :fromDate', { fromDate });
+      query = query.andWhere("event.endTime >= :fromDate", { fromDate });
     }
 
     if (toDate) {
-      query = query.andWhere('event.startTime <= :toDate', { toDate });
+      query = query.andWhere("event.startTime <= :toDate", { toDate });
     }
 
-    return query.orderBy('event.startTime', 'ASC').getMany();
+    return query.orderBy("event.startTime", "ASC").getMany();
   }
 
   /**
@@ -63,11 +66,11 @@ export class EventService {
     return this.eventRepo.find({
       where: {
         countyId,
-        status: 'active',
+        status: "active",
         startTime: MoreThan(now),
         endTime: LessThan(futureDate),
       },
-      order: { startTime: 'ASC' },
+      order: { startTime: "ASC" },
     });
   }
 
@@ -76,8 +79,8 @@ export class EventService {
    */
   async getAllEvents(limit = 100, offset = 0): Promise<Event[]> {
     return this.eventRepo.find({
-      where: { status: 'active' },
-      order: { startTime: 'ASC' },
+      where: { status: "active" },
+      order: { startTime: "ASC" },
       take: limit,
       skip: offset,
     });
@@ -104,7 +107,7 @@ export class EventService {
    */
   async cancelEvent(id: string, reason?: string): Promise<Event> {
     return this.updateEvent(id, {
-      status: 'cancelled',
+      status: "cancelled",
       statusChangedAt: new Date(),
     });
   }

@@ -1,537 +1,199 @@
-import { Component, OnInit, OnDestroy, AfterViewInit, ViewChild, ElementRef, HostListener } from '@angular/core';
-import {
-  BehaviorSubject, Subject, EMPTY, catchError, combineLatest, debounceTime, distinctUntilChanged, filter, map, of,
-  switchMap, takeUntil, tap,
-} from 'rxjs';
+﻿import { Component, OnInit, OnDestroy, AfterViewInit, ViewChild, ElementRef, HostListener } from '@angular/core';
+import { BehaviorSubject, Subject, EMPTY, catchError, combineLatest, distinctUntilChanged, filter, map, of, switchMap, takeUntil, tap, timer } from 'rxjs';
+import { CommonModule } from '@angular/common';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { LucideAngularModule } from 'lucide-angular';
 import { MapService, ViewportBounds } from '../../core/services/map.service';
 import { CountyService, CountySummary, countySlug } from '../../core/services/county.service';
 import { Poi, POIService } from '../../core/services/poi.service';
 import { Event as AppEvent, EventService } from '../../core/services/event.service';
+import { MapMode, MapPlace, placeKey, viewportKey, visiblePlaces } from '../../core/services/discovery.model';
 import { CATEGORIES } from '../landing/landing-content';
-import { CommonModule } from '@angular/common';
-import { ActivatedRoute, ParamMap, Router, RouterLink } from '@angular/router';
-import { LucideAngularModule } from 'lucide-angular';
 import { ICONS } from '../../shared/icons/icons';
 import { CategoryIconComponent } from '../../shared/icons/category-icon.component';
 
-const HUNGARY_BOUNDS = { minLat: 45.5, maxLat: 48.7, minLng: 16, maxLng: 23 };
-const MAX_VISIBLE_CARDS = 20;
-const EVENT_PANEL_ZOOM_THRESHOLD = 10;
-
-const plain = (s: string) =>
-  s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
-
-type EventDatePreset = 'any' | 'today' | 'tomorrow' | 'nextDays' | 'fixed';
-
-type ExploreCard = {
-  kind: 'poi' | 'event';
-  id: string;
-  title: string;
-  category: string;
-  description?: string;
-  sponsored?: boolean;
-  source?: string;
-  website?: string;
-  sourceUrl?: string;
-  address?: string;
-  phone?: string;
-  location?: { type: string; coordinates: [number, number] };
-  startTime?: Date;
-  endTime?: Date;
-  venue?: string;
-  settlement?: string;
-};
+type DatePreset = 'any' | 'today' | 'tomorrow' | 'nextDays' | 'fixed';
+interface ExploreCard extends MapPlace {
+  description?: string; sponsored?: boolean; source?: string; website?: string; address?: string; phone?: string;
+  startTime?: Date; endTime?: Date; venue?: string; settlement?: string; countyId?: string; imageUrl?: string;
+}
+interface SearchResult { cards: ExploreCard[]; eventError: string; poiError: string }
+const plain = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
 
 @Component({
-  selector: 'app-explore',
-  standalone: true,
-  imports: [
-    CommonModule, RouterLink, CategoryIconComponent,
-    LucideAngularModule,
-  ],
-  templateUrl: './explore.component.html',
-  styleUrls: ['./explore.component.scss'],
+  selector: 'app-explore', standalone: true,
+  imports: [CommonModule, RouterLink, CategoryIconComponent, LucideAngularModule],
+  templateUrl: './explore.component.html', styleUrls: ['./explore.component.scss'],
 })
 export class ExploreComponent implements OnInit, AfterViewInit, OnDestroy {
   readonly icons = ICONS;
   @ViewChild('mapElement', { static: true }) mapElement!: ElementRef<HTMLElement>;
-
-  readonly categoryOptions = CATEGORIES.map((c) => ({ key: c.key, name: c.name }));
-
+  readonly categoryOptions = CATEGORIES.filter(c => c.key !== 'event').map(c => ({ key: c.key, name: c.name }));
+  mode: MapMode = 'overview';
   mapZoom = 7;
-  visiblePOIs: Poi[] = [];
   visibleCards: ExploreCard[] = [];
-  selectedCategories: Set<string> = new Set();
-  poiState: 'loading' | 'ready' | 'error' = 'loading';
-  elsewhereCount: number | null = null;
-  mapError = '';
+  selectedCategories = new Set<string>();
+  poiState: 'loading' | 'ready' | 'error' = 'ready';
+  mapError = ''; countyError = ''; eventError = ''; poiError = ''; notice = '';
   counties: CountySummary[] = [];
   selectedCounty?: CountySummary;
   selectedCard?: ExploreCard;
-  countyError = '';
-  countyAttribution = '';
-  notices: string[] = [];
+  introVisible = false;
+  contentMode: 'all' | 'pois' | 'events' = 'all';
   mobileView: 'map' | 'list' = 'map';
-  failedImages = new Set<string>();
-
-  eventDatePreset: EventDatePreset = 'nextDays';
+  eventDatePreset: DatePreset = 'nextDays';
   eventDaysWindow = 7;
   eventFixedDate = '';
-  countyFilterEngaged = false;
-  private randomSeed = Date.now();
-
-  private categoryNotice = '';
-  private countyNotice = '';
-  private searchNotice = '';
+  resultLimit = 20;
   private viewport?: ViewportBounds;
+  private moving = false;
   private reload$ = new Subject<void>();
   private destroy$ = new Subject<void>();
   private counties$ = new BehaviorSubject<CountySummary[] | null>(null);
-  private elsewhereCache = new Map<string, number | null>();
+  private cache = new Map<string, { at: number; value: SearchResult }>();
 
-  constructor(
-    private mapService: MapService,
-    private poiService: POIService,
-    private eventService: EventService,
-    private countyService: CountyService,
-    private route: ActivatedRoute,
-    private router: Router,
-  ) {}
+  constructor(private mapService: MapService, private poiService: POIService, private eventService: EventService,
+    private countyService: CountyService, private route: ActivatedRoute, private router: Router) {}
 
-  get hasActiveFilters(): boolean {
-    return !!this.selectedCounty || this.selectedCategories.size > 0 || this.eventDatePreset !== 'nextDays' || this.eventDaysWindow !== 7;
-  }
-
-  get showEventDateFilters(): boolean {
-    return this.selectedCategories.has('event') || this.mapZoom >= EVENT_PANEL_ZOOM_THRESHOLD;
-  }
-
-  get shouldRandomizeCards(): boolean {
-    return this.countyFilterEngaged;
-  }
-
-  categoryLabel(key: string): string {
-    return this.categoryOptions.find((c) => c.key === key)?.name ?? key;
-  }
-
-  hasCategory(key: string): boolean {
-    return this.selectedCategories.has(key);
-  }
-
-  safeUrl(url: string | null | undefined): string | null {
-    return url && /^https?:\/\//i.test(url) ? url : null;
-  }
-
-  osmLink(card: ExploreCard): string | null {
-    const c = card.location?.coordinates;
-    return c ? `https://www.openstreetmap.org/?mlat=${c[1]}&mlon=${c[0]}#map=17/${c[1]}/${c[0]}` : null;
-  }
-
-  formatEventDate(date?: Date): string {
-    if (!date) return '';
-    return new Intl.DateTimeFormat('hu-HU', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(date);
-  }
+  get hasActiveFilters() { return this.selectedCategories.size > 0 || this.contentMode !== 'all' || this.eventDatePreset !== 'nextDays' || this.eventDaysWindow !== 7; }
+  get showEventDateFilters() { return this.contentMode !== 'pois'; }
+  get introAttractions() { return this.visibleCards.filter(c => c.kind === 'poi' && c.countyId === this.selectedCounty?.id).slice(0, 3); }
+  get introEvents() { return this.visibleCards.filter(c => c.kind === 'event' && c.countyId === this.selectedCounty?.id && c.startTime && c.startTime.getTime() >= Date.now()).slice(0, 3); }
+  get countyAttribution() { return this.selectedCounty?.attribution || this.counties.find(c => c.attribution)?.attribution || ''; }
+  categoryLabel(key: string) { return key === 'event' ? 'Esemény' : this.categoryOptions.find(c => c.key === key)?.name ?? key; }
+  hasCategory(key: string) { return this.selectedCategories.has(key); }
+  cardKey(_index: number, card: ExploreCard) { return placeKey(card); }
+  safeUrl(url?: string | null) { return url && /^https?:\/\//i.test(url) ? url : null; }
+  osmLink(card: ExploreCard) { const c = card.location?.coordinates; return c ? `https://www.openstreetmap.org/?mlat=${c[1]}&mlon=${c[0]}#map=17/${c[1]}/${c[0]}` : null; }
+  formatEventDate(date?: Date) { return date && Number.isFinite(date.getTime()) ? new Intl.DateTimeFormat('hu-HU', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Europe/Budapest' }).format(date) : ''; }
 
   ngOnInit() {
-    this.mapService.viewportChange$.pipe(takeUntil(this.destroy$)).subscribe((v) => {
-      this.viewport = v;
-      this.mapZoom = Math.round(v.zoom * 10) / 10;
+    this.mapService.mode$.pipe(takeUntil(this.destroy$)).subscribe(mode => {
+      this.mode = mode;
+      if (mode !== 'roam') { this.visibleCards = []; this.selectedCard = undefined; this.mapService.setPlaces([]); }
       this.reload$.next();
     });
-    this.mapService.status$.pipe(takeUntil(this.destroy$)).subscribe((s) => {
-      this.mapError = s === 'ready' ? '' : s;
+    this.mapService.status$.pipe(takeUntil(this.destroy$)).subscribe(status => {
+      this.moving = status === 'moving';
+      this.mapError = status.startsWith('map error:') ? status : '';
+      if (this.moving) this.reload$.next();
     });
-
+    this.mapService.viewportChange$.pipe(takeUntil(this.destroy$)).subscribe(v => {
+      this.viewport = v; this.mapZoom = v.zoom; this.reload$.next();
+    });
     this.countyService.getAllCounties().pipe(takeUntil(this.destroy$)).subscribe({
-      next: (counties) => {
-        this.counties = counties;
-        this.countyAttribution = counties.find((c) => c.attribution)?.attribution ?? '';
-        this.mapService.setCounties(counties);
-        this.counties$.next(counties);
-      },
-      error: (err) => {
-        console.error('County request failed', err);
-        this.countyError = 'A vármegyehatárok nem tölthetők be.';
-        this.counties$.next([]);
-      },
+      next: counties => { this.counties = counties; this.mapService.setCounties(counties); this.counties$.next(counties); },
+      error: () => { this.countyError = 'A vármegyehatárok nem tölthetők be. Próbáld újra az oldal betöltését.'; this.counties$.next([]); },
     });
-
-    this.route.queryParamMap.pipe(takeUntil(this.destroy$)).subscribe((p) => this.applyCategoryParam(p));
-
+    this.route.queryParamMap.pipe(takeUntil(this.destroy$)).subscribe(params => {
+      const requested = (params.get('category') || '').split(',').filter(Boolean);
+      const known = new Set(this.categoryOptions.map(c => c.key));
+      this.selectedCategories = new Set(requested.filter(c => known.has(c)));
+      if (requested.includes('event')) this.contentMode = 'events';
+      this.reload$.next();
+    });
     combineLatest([
-      this.route.queryParamMap.pipe(map((p) => p.get('county')), distinctUntilChanged()),
+      this.route.queryParamMap.pipe(map(p => p.get('county')), distinctUntilChanged()),
       this.counties$.pipe(filter((c): c is CountySummary[] => c !== null)),
-    ])
-      .pipe(
-        switchMap(([slug, counties]) => this.applyCountyParam(slug, counties)),
-        takeUntil(this.destroy$),
-      )
-      .subscribe();
-
-    this.mapService.countyClick$.pipe(takeUntil(this.destroy$)).subscribe((id) => {
-      const county = this.counties.find((c) => c.id === id);
-      if (county) this.updateQuery({ county: countySlug(county) });
-    });
-
-    this.mapService.poiClick$.pipe(takeUntil(this.destroy$)).subscribe((id) => {
-      const poi = this.visiblePOIs.find((p) => p.id === id);
-      if (!poi) return;
-      this.selectCard(this.poiToCard(poi), false);
-    });
-
-    this.reload$
-      .pipe(
-        debounceTime(250),
-        tap(() => (this.poiState = 'loading')),
-        switchMap(() => {
-          const v = this.viewport;
-          if (!v) return EMPTY;
-          const categories = Array.from(this.selectedCategories);
-          const poiCategories = categories.filter((c) => c !== 'event');
-          const fetchEvents = categories.length === 0 || categories.includes('event');
-
-          const poiRequest = this.poiService.getPOIsByViewport(
-            v.minLat,
-            v.maxLat,
-            v.minLng,
-            v.maxLng,
-            poiCategories.length > 0 ? poiCategories : undefined,
-          );
-          const eventRequest = fetchEvents
-            ? this.eventService.getEventsByViewport(v.minLat, v.minLng, v.maxLat, v.maxLng, {
-                countyId: this.selectedCounty?.id,
-                days: this.getEventDaysApiParam(),
-              }).pipe(catchError(() => of([] as AppEvent[])))
-            : of([] as AppEvent[]);
-
-          return combineLatest([poiRequest, eventRequest]).pipe(
-            switchMap(([pois, events]) => {
-              const filteredEvents = this.filterEventsByDate(events);
-              const cards = this.limitCards([
-                ...pois.map((poi) => this.poiToCard(poi)),
-                ...filteredEvents.map((event) => this.eventToCard(event)),
-              ]);
-
-              if (pois.length || !poiCategories.length) {
-                return of({ pois, cards, elsewhere: null as number | null });
-              }
-
-              const key = [...poiCategories].sort().join(',');
-              if (this.elsewhereCache.has(key)) {
-                return of({ pois, cards, elsewhere: this.elsewhereCache.get(key)! });
-              }
-              const b = HUNGARY_BOUNDS;
-              return this.poiService.getPOIsByViewport(b.minLat, b.maxLat, b.minLng, b.maxLng, poiCategories).pipe(
-                map((all) => all.length as number | null),
-                catchError(() => of(null as number | null)),
-                tap((n) => this.elsewhereCache.set(key, n)),
-                map((elsewhere) => ({ pois, cards, elsewhere })),
-              );
-            }),
-            catchError((err) => {
-              console.error('POI/Event request failed', err);
-              this.poiState = 'error';
-              return EMPTY;
-            }),
-          );
-        }),
-        takeUntil(this.destroy$),
-      )
-      .subscribe(({ pois, cards, elsewhere }) => {
-        this.visiblePOIs = pois;
-        this.visibleCards = cards;
-        this.elsewhereCount = elsewhere;
-        this.poiState = 'ready';
-        this.mapService.setPOIs(pois);
-        if (this.selectedCard) {
-          this.selectedCard = cards.find((c) => c.kind === this.selectedCard!.kind && c.id === this.selectedCard!.id) ?? this.selectedCard;
-        }
-      });
-  }
-
-  ngAfterViewInit() {
-    this.mapService.initializeMap(this.mapElement.nativeElement, [19.5033, 47.1625], this.mapZoom);
-  }
-
-  ngOnDestroy() {
-    this.destroy$.next();
-    this.destroy$.complete();
-    this.mapService.destroy();
-  }
-
-  @HostListener('document:keydown.escape')
-  onEscape() {
-    if (this.selectedCard) this.closeDetail();
-  }
-
-  private applyCategoryParam(params: ParamMap) {
-    const requested = (params.get('category') ?? '').split(',').map((v) => v.trim()).filter(Boolean);
-    const known = new Set(this.categoryOptions.map((c) => c.key));
-    const valid = requested.filter((v) => known.has(v));
-    const unknown = requested.filter((v) => !known.has(v));
-    this.selectedCategories = new Set(valid);
-    this.categoryNotice = unknown.length ? `Ismeretlen kategória: ${unknown.join(', ')}.` : '';
-    this.updateNotices();
-    this.reload$.next();
-  }
-
-  private applyCountyParam(slug: string | null, counties: CountySummary[]) {
-    this.countyNotice = '';
-    const unselect = () => {
-      this.selectedCounty = undefined;
-      this.mapService.clearCountyDetail();
-    };
-    if (!slug) {
-      unselect();
-      this.updateNotices();
-      return EMPTY;
-    }
-    const county = counties.find((c) => countySlug(c) === slug);
-    if (!county || !county.active) {
-      unselect();
-      this.countyNotice = this.countyError
-        ? `A(z) „${slug}” vármegye nem jeleníthető meg, mert a vármegyehatárok nem töltődtek be.`
-        : county
-          ? `A(z) ${county.name} vármegye még nem érhető el.`
-          : `Ismeretlen vármegye: „${slug}”.`;
-      this.updateNotices();
-      return EMPTY;
-    }
-    this.updateNotices();
-    return this.countyService.getCountyGeometry(county.id).pipe(
-      tap((g) => {
-        this.selectedCounty = county;
+    ]).pipe(switchMap(([slug, counties]) => {
+      this.notice = '';
+      if (!slug) { this.selectedCounty = undefined; this.introVisible = false; this.mapService.clearCountyDetail(); return EMPTY; }
+      const county = counties.find(c => countySlug(c) === slug);
+      if (!county || !county.active) { this.notice = 'Ez a vármegye jelenleg nem választható.'; return EMPTY; }
+      return this.countyService.getCountyGeometry(county.id).pipe(tap(g => {
+        if (!g?.geometry) { this.notice = 'A vármegye geometriája nem érhető el.'; return; }
+        this.selectedCounty = county; this.introVisible = true; this.mobileView = 'list';
         this.mapService.showCountyDetail(county.id, g.geometry);
-        this.reload$.next();
-      }),
-      catchError((err) => {
-        console.error('County geometry request failed', err);
-        this.countyError = 'A vármegye részletei nem tölthetők be.';
-        return EMPTY;
-      }),
-    );
+      }), catchError(() => { this.notice = 'A vármegye részletei nem tölthetők be.'; return EMPTY; }));
+    }), takeUntil(this.destroy$)).subscribe();
+    this.mapService.countyClick$.pipe(takeUntil(this.destroy$)).subscribe(id => this.chooseCounty(id));
+    this.mapService.placeClick$.pipe(takeUntil(this.destroy$)).subscribe(key => {
+      const card = this.visibleCards.find(c => placeKey(c) === key);
+      if (card) { this.selectCard(card, false); this.mobileView = 'list'; }
+    });
+    // Outer switchMap cancels on movement/filter change immediately; only the new request waits 400 ms.
+    this.reload$.pipe(switchMap(() => {
+      if (this.mode !== 'roam' || this.moving || !this.viewport) return EMPTY;
+      return timer(400).pipe(switchMap(() => {
+        const v = { ...this.viewport! }, categories = [...this.selectedCategories].sort();
+        const key = viewportKey(v, [categories, this.contentMode, this.eventDatePreset, this.eventDaysWindow, this.eventFixedDate]);
+        this.poiState = 'loading';
+        const cached = this.cache.get(key);
+        if (cached && Date.now() - cached.at < 60000) return of(cached.value);
+        const pois = this.contentMode === 'events' ? of({ pois: [] as Poi[], error: '' }) :
+          this.poiService.getPOIsByViewport(v.minLat, v.maxLat, v.minLng, v.maxLng, categories.length ? categories : undefined).pipe(
+            map(pois => ({ pois, error: '' })), catchError(() => of({ pois: [] as Poi[], error: 'A helyek nem tölthetők be. Próbáld újra.' })));
+        const events = this.contentMode === 'pois' ? of({ events: [] as AppEvent[], error: '' }) :
+          this.eventService.getEventsByViewport(v.minLat, v.minLng, v.maxLat, v.maxLng, { days: this.getEventDays() }).pipe(
+            map(events => ({ events, error: '' })), catchError(() => of({ events: [] as AppEvent[], error: 'Az események nem tölthetők be. Próbáld újra.' })));
+        return combineLatest([pois, events]).pipe(map(([p, e]): SearchResult => {
+          const cards = visiblePlaces([...p.pois.map(poi => this.poiToCard(poi)),
+            ...this.filterEvents(e.events).map(event => this.eventToCard(event))], v)
+            .sort((a,b) => a.title.localeCompare(b.title, 'hu') || placeKey(a).localeCompare(placeKey(b)));
+          const result = { cards, eventError: e.error, poiError: p.error };
+          if (!p.error && !e.error) {
+            if (this.cache.size >= 20) this.cache.delete(this.cache.keys().next().value!);
+            this.cache.set(key, { at: Date.now(), value: result });
+          }
+          return result;
+        }));
+      }));
+    }), takeUntil(this.destroy$)).subscribe(result => {
+      this.visibleCards = result.cards; this.eventError = result.eventError; this.poiError = result.poiError;
+      this.resultLimit = 20; this.poiState = result.poiError && result.eventError ? 'error' : 'ready';
+      this.mapService.setPlaces(result.cards);
+      if (this.selectedCard) { this.selectedCard = result.cards.find(c => placeKey(c) === placeKey(this.selectedCard!)); this.mapService.selectPlace(this.selectedCard ? placeKey(this.selectedCard) : null); }
+    });
   }
-
-  private updateNotices() {
-    this.notices = [this.categoryNotice, this.countyNotice, this.searchNotice].filter(Boolean);
-  }
-
-  private updateQuery(params: Record<string, string | null>) {
-    this.router.navigate([], { relativeTo: this.route, queryParams: params, queryParamsHandling: 'merge' });
-  }
-
-  toggleCategory(category: string, on: boolean) {
-    const next = new Set(this.selectedCategories);
-    if (on) next.add(category);
-    else next.delete(category);
-    const list = this.categoryOptions.map((c) => c.key).filter((k) => next.has(k));
-    this.updateQuery({ category: list.length ? list.join(',') : null });
-  }
-
-  removeCounty() {
-    this.updateQuery({ county: null });
-  }
-
-  resetFilters() {
-    this.closeDetail();
-    this.searchNotice = '';
-    this.countyFilterEngaged = false;
-    this.eventDatePreset = 'nextDays';
-    this.eventDaysWindow = 7;
-    this.eventFixedDate = '';
-    this.updateQuery({ county: null, category: null });
-    this.mapService.resetView();
-    this.reload$.next();
-  }
-
-  showWholeCountry() {
-    this.mapService.resetView();
-  }
-
+  ngAfterViewInit() { this.mapService.initializeMap(this.mapElement.nativeElement); }
+  ngOnDestroy() { this.destroy$.next(); this.destroy$.complete(); this.mapService.destroy(); }
+  @HostListener('document:keydown.escape') onEscape() { this.closeDetail(); }
+  private updateQuery(params: Record<string,string|null>) { this.router.navigate([], { relativeTo: this.route, queryParams: params, queryParamsHandling: 'merge' }); }
+  chooseCounty(id: string) { const c = this.counties.find(c => c.id === id && c.active); if (c) this.updateQuery({ county: countySlug(c) }); }
   searchCounty(value: string, input: HTMLInputElement) {
-    this.activateCountyRandom();
-    const q = plain(value);
-    this.searchNotice = '';
-      if (!q) {
-        this.updateNotices();
-        return;
-      }
-      const hit =
-        this.counties.find((c) => plain(c.name) === q || countySlug(c) === q) ??
-        this.counties.find((c) => plain(c.name).startsWith(q));
-    if (hit && hit.active) {
-      this.updateQuery({ county: countySlug(hit) });
-      input.value = '';
-    } else {
-      this.searchNotice = `Nincs ilyen vármegye: „${value.trim()}”.`;
-    }
-    this.updateNotices();
+    const q = plain(value); if (!q) return;
+    const c = this.counties.find(c => plain(c.name) === q || countySlug(c) === q) ?? this.counties.find(c => plain(c.name).startsWith(q));
+    if (c?.active) { this.chooseCounty(c.id); input.value = ''; } else this.notice = 'Nincs ilyen elérhető vármegye.';
   }
-
-  activateCountyRandom() {
-    this.countyFilterEngaged = true;
-    this.randomSeed = Date.now();
-    this.reload$.next();
+  toggleCategory(category: string, on: boolean) {
+    const next = new Set(this.selectedCategories); if (on) next.add(category); else next.delete(category);
+    this.updateQuery({ category: [...next].sort().join(',') || null });
   }
-
+  setContentMode(mode: 'all' | 'pois' | 'events') { this.contentMode = mode; this.updateQuery({ category: [...this.selectedCategories].join(',') || null }); this.reload$.next(); }
+  resetFilters() { this.contentMode = 'all'; this.eventDatePreset = 'nextDays'; this.eventDaysWindow = 7; this.eventFixedDate = ''; this.selectedCategories.clear(); this.updateQuery({ category: null }); this.reload$.next(); }
+  removeCounty() { this.updateQuery({ county: null }); }
+  dismissIntroduction() { this.introVisible = false; }
+  showWholeCountry() { this.selectedCounty = undefined; this.introVisible = false; this.closeDetail(); this.updateQuery({ county: null }); this.mobileView = 'map'; this.mapService.resetView(); }
+  showMore() { this.resultLimit += 20; }
+  retry() { this.cache.clear(); this.reload$.next(); }
   selectCard(card: ExploreCard, fly: boolean) {
-    this.selectedCard = card;
-    if (card.kind === 'poi') {
-      this.mapService.selectPOI(card.id);
-    }
+    this.selectedCard = card; this.mapService.selectPlace(placeKey(card));
     const c = card.location?.coordinates;
-    if (fly && c) this.mapService.flyTo(c[0], c[1], Math.max(this.mapZoom, 12));
-    if (fly) this.mobileView = 'map';
-    setTimeout(() => document.getElementById('card-' + card.kind + '-' + card.id)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
+    if (fly && c) { this.mapService.flyTo(c[0], c[1], Math.max(this.mapZoom, 12)); this.mobileView = 'map'; }
   }
-
-  closeDetail() {
-    this.selectedCard = undefined;
-    this.mapService.selectPOI(null);
-  }
-
-  retry() {
-    this.reload$.next();
-  }
-
-  hoverCard(card: ExploreCard | null) {
-    if (!card || card.kind !== 'poi') {
-      this.mapService.highlightPOI(null);
-      return;
-    }
-    this.mapService.highlightPOI(card.id);
-  }
-
-  setMobileView(view: 'map' | 'list') {
-    this.mobileView = view;
-  }
-
-  setEventDatePreset(preset: EventDatePreset) {
-    this.eventDatePreset = preset;
-    if (preset !== 'fixed') {
-      this.eventFixedDate = '';
-    }
-    this.reload$.next();
-  }
-
-  onEventDaysWindowChange(days: number) {
-    this.eventDaysWindow = Math.max(1, Math.min(30, days));
-    this.eventDatePreset = 'nextDays';
-    this.reload$.next();
-  }
-
-  onFixedDateChange(value: string) {
-    this.eventFixedDate = value;
-    this.eventDatePreset = value ? 'fixed' : 'any';
-    this.reload$.next();
-  }
-
-  private getEventDaysApiParam(): number | undefined {
-    if (this.eventDatePreset === 'today') return 1;
-    if (this.eventDatePreset === 'tomorrow') return 2;
-    if (this.eventDatePreset === 'nextDays') return this.eventDaysWindow;
-    if (this.eventDatePreset === 'fixed') return 60;
-    return 30;
-  }
-
-  private filterEventsByDate(events: AppEvent[]): AppEvent[] {
-    const today = this.toDateOnly(new Date());
-    return events.filter((event) => {
-      const start = new Date(event.startTime);
-      if (Number.isNaN(start.getTime())) return false;
-      const startDate = this.toDateOnly(start);
-      if (this.eventDatePreset === 'today') {
-        return startDate === today;
-      }
-      if (this.eventDatePreset === 'tomorrow') {
-        const tomorrow = this.addDays(today, 1);
-        return startDate === tomorrow;
-      }
-      if (this.eventDatePreset === 'nextDays') {
-        const from = today;
-        const to = this.addDays(today, this.eventDaysWindow);
-        return startDate >= from && startDate <= to;
-      }
-      if (this.eventDatePreset === 'fixed' && this.eventFixedDate) {
-        return startDate === this.eventFixedDate;
-      }
+  closeDetail() { this.selectedCard = undefined; this.mapService.selectPlace(null); }
+  hoverCard(card: ExploreCard | null) { this.mapService.highlightPlace(card ? placeKey(card) : null); }
+  setMobileView(view: 'map' | 'list') { this.mobileView = view; }
+  setEventDatePreset(preset: DatePreset) { this.eventDatePreset = preset; if (preset !== 'fixed') this.eventFixedDate = ''; this.reload$.next(); }
+  onEventDaysWindowChange(days: number) { this.eventDaysWindow = Math.max(1, Math.min(30, days)); this.eventDatePreset = 'nextDays'; this.reload$.next(); }
+  onFixedDateChange(value: string) { this.eventFixedDate = value; this.eventDatePreset = value ? 'fixed' : 'any'; this.reload$.next(); }
+  private getEventDays() { return this.eventDatePreset === 'today' ? 1 : this.eventDatePreset === 'tomorrow' ? 2 : this.eventDatePreset === 'nextDays' ? this.eventDaysWindow : 60; }
+  private dateOnly(date: Date) { return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Budapest', year: 'numeric', month: '2-digit', day: '2-digit' }).format(date); }
+  private filterEvents(events: AppEvent[]) {
+    const now = new Date(), today = this.dateOnly(now);
+    const tomorrow = this.dateOnly(new Date(now.getTime() + 86400000));
+    return events.filter(e => {
+      const start = new Date(e.startTime); if (!Number.isFinite(start.getTime())) return false;
+      const day = this.dateOnly(start);
+      if (this.eventDatePreset === 'today') return day === today;
+      if (this.eventDatePreset === 'tomorrow') return day === tomorrow;
+      if (this.eventDatePreset === 'fixed' && this.eventFixedDate) return day === this.eventFixedDate;
       return true;
     });
   }
-
-  private limitCards(cards: ExploreCard[]): ExploreCard[] {
-    if (!this.shouldRandomizeCards) {
-      return cards.slice(0, MAX_VISIBLE_CARDS);
-    }
-    return [...cards]
-      .sort((a, b) => this.seededRank(a) - this.seededRank(b))
-      .slice(0, MAX_VISIBLE_CARDS);
-  }
-
-  private seededRank(card: ExploreCard): number {
-    const s = `${this.randomSeed}:${card.kind}:${card.id}`;
-    let hash = 2166136261;
-    for (let i = 0; i < s.length; i++) {
-      hash ^= s.charCodeAt(i);
-      hash = Math.imul(hash, 16777619);
-    }
-    return hash >>> 0;
-  }
-
-  private poiToCard(poi: Poi): ExploreCard {
-    return {
-      kind: 'poi',
-      id: poi.id,
-      title: poi.name,
-      category: poi.category,
-      description: poi.description,
-      sponsored: poi.sponsored,
-      source: poi.source,
-      website: poi.website,
-      address: poi.address,
-      phone: poi.phone,
-      location: poi.location,
-    };
-  }
-
-  private eventToCard(event: AppEvent): ExploreCard {
-    const startTime = event.startTime ? new Date(event.startTime) : undefined;
-    const endTime = event.endTime ? new Date(event.endTime) : undefined;
-    return {
-      kind: 'event',
-      id: event.id,
-      title: event.title,
-      category: 'event',
-      description: event.description,
-      sponsored: event.sponsored,
-      source: 'events',
-      sourceUrl: event.sourceUrl,
-      website: event.sourceUrl,
-      location: event.location,
-      startTime,
-      endTime,
-      venue: event.venue,
-      settlement: event.settlement,
-    };
-  }
-
-  private toDateOnly(date: Date): string {
-    const y = date.getFullYear();
-    const m = String(date.getMonth() + 1).padStart(2, '0');
-    const d = String(date.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
-  }
-
-  private addDays(dateOnly: string, days: number): string {
-    const [y, m, d] = dateOnly.split('-').map(Number);
-    const dt = new Date(y, m - 1, d);
-    dt.setDate(dt.getDate() + days);
-    return this.toDateOnly(dt);
-  }
+  private poiToCard(p: Poi): ExploreCard { return { kind: 'poi', id: p.id, title: p.name, category: p.category, description: p.description,
+    sponsored: p.sponsored, source: p.source, website: p.website, address: p.address, phone: p.phone, location: p.location, countyId: p.countyId, imageUrl: p.imageUrl }; }
+  private eventToCard(e: AppEvent): ExploreCard { return { kind: 'event', id: e.id, title: e.title, category: 'event', description: e.description,
+    sponsored: e.sponsored, source: 'events', website: e.sourceUrl, location: e.location, startTime: new Date(e.startTime),
+    endTime: e.endTime ? new Date(e.endTime) : undefined, venue: e.venue, settlement: e.settlement, countyId: e.countyId }; }
 }

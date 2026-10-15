@@ -8,6 +8,7 @@ interface ArtCounty {
   name: string;
   slug: string;
   d: string;
+  active: boolean;
 }
 
 type Point2D = [number, number];
@@ -31,7 +32,10 @@ const KM_PER_DEG_LAT = 111.19;
       <svg *ngIf="state === 'ready'" [attr.viewBox]="viewBox" role="group" aria-label="Magyarország vármegyéi: válassz egyet a felfedezéshez">
         <ng-container *ngFor="let c of counties; let i = index">
           <a
-            [attr.href]="'/explore?county=' + c.slug"
+            [attr.href]="c.active ? '/explore?county=' + c.slug : null"
+            [attr.aria-disabled]="!c.active"
+            [attr.tabindex]="c.active ? 0 : -1"
+            [class.inactive]="!c.active"
             [attr.aria-label]="c.name + ' vármegye megnyitása a térképen'"
             [class.hover]="c.id === hovered"
             [style.--i]="i"
@@ -77,6 +81,7 @@ const KM_PER_DEG_LAT = 111.19;
         transition: fill 0.25s ease;
       }
       a.hover path { fill: rgba(198, 240, 90, 0.38); }
+      a.inactive { opacity: .35; cursor: default; }
       a:focus-visible path { stroke: #f2efe6; stroke-width: 3; fill: rgba(198, 240, 90, 0.38); }
       .status { margin: 0; padding: 3rem 1rem; text-align: center; color: #a9b3a8; font-size: 0.95rem; }
       .status.error { color: #f2efe6; }
@@ -140,6 +145,7 @@ export class CountyArtComponent implements OnInit {
 
   open(event: Event, county: ArtCounty) {
     event.preventDefault();
+    if (!county.active) return;
     this.router.navigate(['/explore'], { queryParams: { county: county.slug } });
   }
 
@@ -159,10 +165,11 @@ export class CountyArtComponent implements OnInit {
       minY = Math.min(minY, y); maxY = Math.max(maxY, y);
       return [x, y];
     };
-    const raw = list.map((c): { id: string; name: string; slug: string; rings: Point2D[][] } => ({
+    const raw = list.map((c): { id: string; name: string; slug: string; active: boolean; rings: Point2D[][] } => ({
       id: c.id,
       name: c.name,
       slug: countySlug(c),
+      active: c.active,
       rings: c.displayGeometry!.coordinates.flatMap((poly: number[][][]) =>
         poly.map((ring: number[][]) => ring.map(project) as Point2D[]),
       ),
@@ -172,6 +179,7 @@ export class CountyArtComponent implements OnInit {
       id: c.id,
       name: c.name,
       slug: c.slug,
+      active: c.active,
       d: c.rings
         .map((r: Point2D[]) => 'M' + r.map(([x, y]: Point2D) => `${f(x - minX)} ${f(y - minY)}`).join('L') + 'Z')
         .join(''),

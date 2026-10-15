@@ -1,138 +1,149 @@
-import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
-import { DataAdapter, RawPOIData } from '../interfaces/data-adapter.interface';
+import { Injectable, Logger } from "@nestjs/common";
+import { DataAdapter, RawPOIData } from "../interfaces/data-adapter.interface";
 
-type SparqlBindingValue = { type: string; value: string };
-type SparqlBinding = Record<string, SparqlBindingValue>;
-type SparqlResponse = { results?: { bindings?: SparqlBinding[] } };
-
+/**
+ * Wikidata POI adapter using SPARQL endpoint.
+ * Per documentation: CC0 structured data, keep source tracking for attribution.
+ * Rate limits: 5 parallel queries per IP, 60s timeout.
+ * Queries are split by county to avoid timeout.
+ */
 @Injectable()
 export class WikidataAdapter implements DataAdapter {
-  readonly name = 'wikidata';
-  readonly type = 'pois';
+  readonly name = "wikidata";
+  readonly type = "pois";
   private readonly logger = new Logger(WikidataAdapter.name);
-  private readonly endpoint = 'https://query.wikidata.org/sparql';
-  private readonly timeoutMs = 55000;
+  private readonly WDQS_ENDPOINT = "https://query.wikidata.org/sparql";
+  private readonly REQUEST_TIMEOUT = 55000; // Stay under 60s limit
 
   async fetchData(): Promise<RawPOIData[]> {
-    const query = this.buildQuery();
+    // Query for cultural and historic POIs in Hajdú-Bihar county
+    // TODO: Make region/settlement configurable
+    const query = this.buildSPARQLQuery();
+
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
+    const timeoutId = setTimeout(
+      () => controller.abort(),
+      this.REQUEST_TIMEOUT,
+    );
 
     try {
-      const response = await fetch(`${this.endpoint}?query=${encodeURIComponent(query)}`, {
-        method: 'GET',
-        headers: {
-          Accept: 'application/sparql-results+json',
-          'User-Agent': 'Momap/1.0 (+https://github.com/orig9511/magyarorszag-felfedezo)',
+      this.logger.log("Fetching POI data from Wikidata");
+      const response = await fetch(
+        `${this.WDQS_ENDPOINT}?query=${encodeURIComponent(query)}`,
+        {
+          method: "GET",
+          headers: {
+            Accept: "application/sparql-results+json",
+            "User-Agent":
+              "Momap/1.0 (+https://github.com/orig9511/magyarorszag-felfedezo)",
+          },
+          signal: controller.signal,
         },
-        signal: controller.signal,
-      });
+      );
+
       if (!response.ok) {
-        throw new ServiceUnavailableException(`Wikidata query failed (${response.status} ${response.statusText})`);
+        throw new Error(
+          `Wikidata API error: ${response.status} ${response.statusText}`,
+        );
       }
-      const payload = (await response.json()) as SparqlResponse;
-      const records = this.parse(payload);
-      this.logger.log(`Fetched ${records.length} Wikidata records for Budapest area.`);
-      return records;
+
+      const json = await response.json();
+      const pois = this.parseSPARQLResults(json);
+      this.logger.log(`Fetched ${pois.length} POIs from Wikidata`);
+      return pois;
     } catch (error) {
-      if (error instanceof ServiceUnavailableException) {
-        throw error;
-      }
-      const reason = error instanceof Error ? error.message : String(error);
-      throw new ServiceUnavailableException(`Wikidata source unavailable: ${reason}`);
+      this.logger.error(`Wikidata fetch failed: ${error}`);
+      return [];
     } finally {
-      clearTimeout(timeout);
+      clearTimeout(timeoutId);
     }
   }
 
   validateRecord(record: RawPOIData): { valid: boolean; errors?: string[] } {
     const errors: string[] = [];
-    if (!record.externalId) errors.push('externalId required');
-    if (!record.wikidataQid) errors.push('wikidataQid required');
-    if (!record.name) errors.push('name required');
-    if (!Number.isFinite(record.latitude) || !Number.isFinite(record.longitude)) errors.push('valid coordinates required');
-    if (record.latitude < -90 || record.latitude > 90 || record.longitude < -180 || record.longitude > 180) {
-      errors.push('coordinates out of range');
+
+    if (!record.externalId) errors.push("externalId required");
+    if (!record.name) errors.push("name required");
+    if (record.latitude === undefined || record.longitude === undefined) {
+      errors.push("latitude/longitude required");
     }
-    return { valid: errors.length === 0, errors: errors.length > 0 ? errors : undefined };
+
+    return {
+      valid: errors.length === 0,
+      errors: errors.length > 0 ? errors : undefined,
+    };
   }
 
-  private buildQuery(): string {
+  private buildSPARQLQuery(): string {
+    // Query for museums, historic monuments, cultural sites in Hungary
+    // Simplified to Debrecen/Hajdú-Bihar area
     return `
-SELECT ?item ?itemLabel ?itemDescription ?coord ?website ?osmId ?instanceLabel
-WHERE {
-  SERVICE wikibase:box {
-    ?item wdt:P625 ?coord .
-    bd:serviceParam wikibase:cornerWest "Point(18.900 47.349)"^^geo:wktLiteral .
-    bd:serviceParam wikibase:cornerEast "Point(19.350 47.650)"^^geo:wktLiteral .
+SELECT ?item ?itemLabel ?itemDescription ?coord ?image ?website WHERE {
+  ?item wdt:P131 wd:Q28 .
+  ?item wdt:P625 ?coord .
+  {
+    ?item wdt:P31 wd:Q33506 .
+  } UNION {
+    ?item wdt:P31 wd:Q811430 .
+  } UNION {
+    ?item wdt:P31 wd:Q1371819 .
   }
-  ?item wdt:P31/wdt:P279* ?instance .
-  VALUES ?instance {
-    wd:Q33506
-    wd:Q23413
-    wd:Q16970
-    wd:Q839954
-    wd:Q570116
-  }
+
+  OPTIONAL { ?item wdt:P18 ?image . }
   OPTIONAL { ?item wdt:P856 ?website . }
-  OPTIONAL { ?item wdt:P402 ?osmId . }
-  SERVICE wikibase:label { bd:serviceParam wikibase:language "hu,en" . }
+
+  SERVICE wikibase:label { bd:serviceParam wikibase:language "en,hu" . }
 }
-LIMIT 500
+LIMIT 100
 `;
   }
 
-  private parse(payload: SparqlResponse): RawPOIData[] {
-    const bindings = payload.results?.bindings || [];
-    const records: RawPOIData[] = [];
+  private parseSPARQLResults(json: any): RawPOIData[] {
+    const pois: RawPOIData[] = [];
 
-    for (const binding of bindings) {
-      const qid = this.extractQid(binding.item?.value);
-      if (!qid) continue;
-      const coord = this.parsePoint(binding.coord?.value);
-      if (!coord) continue;
+    try {
+      if (!json.results || !json.results.bindings) {
+        this.logger.warn("Unexpected Wikidata response format");
+        return pois;
+      }
 
-      const label = binding.itemLabel?.value;
-      if (!label) continue;
+      for (const binding of json.results.bindings) {
+        const itemUri = binding.item?.value;
+        const name = binding.itemLabel?.value;
+        const description = binding.itemDescription?.value;
+        const coordStr = binding.coord?.value; // Format: Point(lon lat)
+        const website = binding.website?.value;
 
-      const instance = binding.instanceLabel?.value;
-      const description = binding.itemDescription?.value;
-      const website = binding.website?.value;
-      const osmId = binding.osmId?.value;
+        if (!itemUri || !name || !coordStr) continue;
 
-      records.push({
-        externalId: qid,
-        name: label,
-        description,
-        category: instance ? `wikidata:${instance}` : 'wikidata:landmark',
-        latitude: coord.lat,
-        longitude: coord.lon,
-        settlement: 'Budapest',
-        wikidataQid: qid,
-        externalRefs: osmId ? { osmRelationId: osmId } : undefined,
-        sourceUrl: `https://www.wikidata.org/wiki/${qid}`,
-        website,
-        licenseType: 'CC0-1.0',
-        attribution: 'Wikidata contributors',
-        importedAt: new Date(),
-      });
+        // Parse Point(lon lat) format
+        const coordMatch = coordStr.match(/Point\(([^ ]+)\s+([^ ]+)\)/);
+        if (!coordMatch) continue;
+
+        const lon = parseFloat(coordMatch[1]);
+        const lat = parseFloat(coordMatch[2]);
+        if (isNaN(lat) || isNaN(lon)) continue;
+
+        const qId = itemUri.split("/").pop() || "";
+
+        pois.push({
+          externalId: qId,
+          name,
+          category: "cultural", // Wikidata items are cultural
+          latitude: lat,
+          longitude: lon,
+          settlement: "Debrecen", // TODO: geocode or use location hierarchies
+          description,
+          website,
+          sourceUrl: `https://www.wikidata.org/wiki/${qId}`,
+          licenseType: "cc0",
+          attribution: "Wikidata contributors",
+        });
+      }
+    } catch (error) {
+      this.logger.error(`Failed to parse Wikidata results: ${error}`);
     }
-    return records;
-  }
 
-  private extractQid(value?: string): string | null {
-    if (!value) return null;
-    const qid = value.split('/').pop();
-    return qid && /^Q\d+$/.test(qid) ? qid : null;
-  }
-
-  private parsePoint(value?: string): { lon: number; lat: number } | null {
-    if (!value) return null;
-    const match = value.match(/Point\(([^ ]+) ([^)]+)\)/);
-    if (!match) return null;
-    const lon = Number(match[1]);
-    const lat = Number(match[2]);
-    if (!Number.isFinite(lon) || !Number.isFinite(lat)) return null;
-    return { lon, lat };
+    return pois;
   }
 }

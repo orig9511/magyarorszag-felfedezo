@@ -14,6 +14,7 @@ export interface CountySummary {
   nameEn: string;
   code: string;
   active: boolean;
+  description?: string;
   attribution?: string;
   geometry?: Geometry;
   displayGeometry?: Geometry;
@@ -38,11 +39,11 @@ export class CountyService {
   getAllCounties(): Observable<CountySummary[]> {
     return this.http.get<CountySummary[]>(this.apiUrl).pipe(
       map((counties) =>
-        counties.map((county) => ({
+        counties.filter((county) => !(county.code === 'HU-BP' && counties.some(c => c.code === 'HU-BU'))).map((county) => ({
           ...county,
-          active: county.active ?? true,
+          active: county.active === true,
           displayGeometry: county.displayGeometry || county.geometry,
-          attribution: county.attribution || "Lechner Tudásközpont / Open data",
+          attribution: county.attribution,
         })),
       ),
     );

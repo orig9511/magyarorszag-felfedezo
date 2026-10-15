@@ -7,12 +7,23 @@
 
 ## Aktuális munkafázis és elsőbbség
 
-Audit és dokumentáció. Az alábbi korábbi technológiai és termékdöntések történeti kontextust adnak; az audit és az implementációs terv kifejezett jóváhagyását nem helyettesítik. A meglévő alkalmazás működése külön ellenőrzést igényel. A redesign prompt későbbi specifikáció, jelenleg nem végrehajtandó feladat.
+- [x] DB-001 – Read-only PostgreSQL-felmérés és biztonságos migrációs terv dokumentálva (2026-10-15); részletek: docs/outputs/DB-001.md. PG17.6 / 5433 / C:\Program Files\PostgreSQL\17\data; MOMAP-adatok a postgres adatbázisban, PostGIS 3.5.3. A mentések és backend futásidejű integráció nem igazoltak.
+- [ ] DB-001-MIGRATION – KÜLÖN JÓVÁHAGYÁSRA VÁR: cél D:\PostgreSQL\17\data; mentés és restore-próba, PEM-függőségek, karbantartási ablak, jogosultságok, adatellenőrzés és rollback szükséges. Migráció nem történt.
 
-- [ ] SETUP-001 – PARTIAL: a dokumentációs munkafolyamat elkészült; záró Git diff ellenőrzése blokkolt. Részletek: OUTPUT.md.
-- [ ] P0-00 – Auditbizonyítékok és dokumentációs ellentmondások felülvizsgálata (Leaflet/MapLibre; szabad kezdőnézet/zárolt országos nézet; korábbi licenc- és költségállítások).
+Az architektúra- és térképes audit elkészült a mostani hatókörben. A 2026-10-15-i Autonomous Map Development Session prompt külön engedélyezte a terv szerinti nem destruktív frontend-fejlesztést, buildet és teszteket; ez nem engedély backendváltozásra, DB-migrációra vagy deployra. A korábbi technológiai, licenc- és költségállítások történeti kontextust adnak; teljes platformauditot és éles jóváhagyást nem helyettesítenek.
 
-A következő javasolt feladat P0-00/P0-01. MAP- és DATA-implementáció az audit és a terv jóváhagyása után indulhat. Commit és push külön jóváhagyást igényel.
+- [x] SETUP-001 – Dokumentációs munkafolyamat; korábbi diff-blokkolás DB-001 alatt megszűnt. Történeti jelentés: docs/outputs/SETUP-001.md.
+- [x] P0-00 – Architektúra/map hatókörben az ellentmondások és bizonyítékhiányok feltárva: docs/research/P0-architecture-map-audit.md és P0-map-provider-audit.md. Teljes OSS/CMS licenc- és költségaudit továbbra is nyitott.
+- [ ] MAP-SESSION-C–F – PARTIAL: frontend-megvalósítás kész, osztályszintű regressziós tesztekkel és production builddel; tényleges böngészős/mobilos és élő API-elfogadás hátravan. Részletek: OUTPUT.md.
+- [ ] MAP-SESSION-G – PARTIAL: build és 19 hálózat nélküli teszt PASS; böngészős hozzáférés elutasítva, UI/GPU/touch ellenőrzés BLOCKED.
+- [x] BACKEND-BUILD-001 – A két TS2353 hiba javítva; backend build és importlánc-regresszió PASS. Történeti jelentés: docs/outputs/BACKEND-BUILD-001.md.
+- [x] BACKEND-CONFIG-001 – Relatív .env miatt kimaradó DATABASE_URL és SCRAM jelszóhiba javítva: munkakönyvtártól független abszolút env-útvonalak, kötelező URL-ellenőrzés. Build és 5 teszt PASS; közvetlen read-only kapcsolat postgres:5433 PASS. Teljes Nest-integráció még UNVERIFIED; OUTPUT.md.
+- [ ] MAP-BACKEND-001 – NYITOTT: event DTO számkonverzió, SRID=4326 viewport, többértékű kategória és dátumszemantika; az eventType fordítási hibák külön BACKEND-BUILD-001 feladatban megoldva. További végrehajtás külön jóváhagyást igényel.
+- [ ] MAP-DATA-001 – KÜLÖN ADAT/MIGRÁCIÓS TERV: 20 kanonikus régió, Budapest seed hivatkozásainak megőrzése/egyeztetése, provenance és entity/migration eltérés. Frontenden a HU-BP csak HU-BU jelenlétében rejtett, DB nem változott.
+
+A következő javasolt munkamenet a backendhibák külön jóváhagyott javítása és a böngészős/élő integrációs elfogadás. Provider-vásárlás, DB-migráció, deploy, commit és push továbbra is külön jóváhagyást igényel.
+
+Jóváhagyott térképes termékkövetelmények: zárolt Magyarország-áttekintés vármegyeválasztásig; animált közelítés után szabad barangolás; a szűrők feletti ismertető önálló bezárása; kb. 400 ms-os viewport-alapú POI/event lekérés; közös térképi és listás eredményhalmaz. Mentett helyek és útitervek későbbi bővítés; most nincs teljes útvonaltervező.
 
 ---
 
@@ -183,7 +194,7 @@ before attempting GPU-intensive blur.
 
 ### P0 — Repository Audit
 
-- [ ] P0-01 Complete repository architecture audit
+- [x] P0-01 Architecture/map audit kész a kért körben; docs/research/P0-architecture-map-audit.md. Teljes platform biztonsági/függőségi sign-off nincs.
 - [ ] P0-02 Verify frontend and backend builds
 - [ ] P0-03 Review database entities and migrations
 - [ ] P0-04 Review environment configuration
@@ -191,11 +202,11 @@ before attempting GPU-intensive blur.
 
 ### P1 — Map Optimization
 
-- [ ] P1-01 Investigate map performance
-- [ ] P1-02 Optimize viewport data loading
-- [ ] P1-03 Implement or verify marker clustering
-- [ ] P1-04 Implement Hungary focus overlay
-- [ ] P1-05 Review production map tile provider
+- [x] P1-01 Map request/rendering forrásaudit; benchmark UNVERIFIED.
+- [ ] P1-02 PARTIAL: 400 ms debounce, azonnali cancel, viewport/filter cache; 19 regressziós teszt részeként ellenőrizve, élő API hátravan.
+- [ ] P1-03 PARTIAL: MapLibre mixed POI/event clustering implementálva; vizuális/cluster click elfogadás hátravan.
+- [ ] P1-04 PARTIAL: országmaszk és vármegyeállapotok implementálva; valós geometriás vizuális ellenőrzés hátravan.
+- [x] P1-05 Provider feltételek felülvizsgálva: docs/research/P0-map-provider-audit.md. Éles szolgáltató még nincs kiválasztva/jóváhagyva.
 
 ### P1 — POI System
 
@@ -283,6 +294,36 @@ After every development task, provide:
 ---
 
 ## 8. DEVELOPMENT HISTORY
+
+### 2026-10-15 — BACKEND-CONFIG-001
+
+- A workspace-munkakönyvtárból a relatív .env nem találta a repository gyökérfájlját; a pg jelszó nélkül, 5432-es alapporttal próbált kapcsolódni. Reprodukció javítás előtt FAIL, javítás után PASS.
+- Abszolút backend-local/repository-root env-útvonalak és titkot nem tartalmazó URL-validáció; valódi .env és jelszó nem változott.
+- Backend build és 5/5 teszt PASS; külön pg Client read-only tranzakcióval a postgres adatbázis 5433-as portján PASS. Teljes Nest alkalmazást nem indítottunk.
+- Migráció, szolgáltatásmódosítás, commit és push nem történt. Korábbi jelentés: docs/outputs/BACKEND-BUILD-001.md.
+
+### 2026-10-15 — BACKEND-BUILD-001
+
+- A két jelentett TS2353 fordítási hibát noEmit ellenőrzéssel reprodukáltuk, majd az importáló által már használt mezőkhöz igazítottuk az Event és RawEventData definícióját.
+- Backend build PASS; valódi adapter→JSON-import→TypeORM entity.create/metadata regressziós teszt PASS, adatbázis és hálózat nélkül.
+- Adatbázis-migráció, alkalmazásindítás, commit, push és deploy nem történt. A viewport API további hibái nyitottak.
+- Korábbi frontendjelentés: docs/outputs/MAP-SESSION-2026-10-15.md.
+
+### 2026-10-15 — P0-00/P0-01 + Autonomous Map Development Session
+
+- A–B: helyi forrás-, séma- és read-only SQL-audit, provider-kutatás, fázisonkénti elfogadási terv elkészült. P0-architecture-map-audit.md az implementáció ELŐTTI bizonyítékokat őrzi.
+- C–F: engedélyezett frontend-változások: zárolt overview, county transition/roam, önálló intro-X, sidebar filterek, közös mixed marker/card modell, klaszterek, 400 ms viewport pipeline, korlátos cache és forrásrészhibák. Landing/editorial route megtartva; nem alakítottuk egyetlen közös kamerájú landing/explorer oldallá.
+- G: 19 osztály/modellszintű teszt PASS; frontend production build PASS. Backend előzetes noEmit ellenőrzés FAIL két meglévő eventType hibával. HTTP/DB-író alkalmazásindítás nem történt.
+- Böngésző UI-próbáját a jogosultsági kapu elutasította; nem történt kerülőutas teszt. Mobil, GPU, országmaszk, tile/attribúció és élő eseménytalálatok elfogadása nyitott.
+- Backend és scripts 49 fájlja SHA-256 összevetéssel változatlan. DB, szolgáltatások, titkok nem módosultak; függőségtelepítés, commit, push, merge, vásárlás és deploy nem történt.
+
+### 2026-10-15 — DB-001
+
+- Csak olvasási OS- és SQL-felmérés; a PG17 aktív adatkönyvtára igazoltan a C:-n van. Külön PG18-szolgáltatás fut a 5432-es porton.
+- A postgres adatbázisban 21 county, 202 POI, 2 event, 1 settlement és 3 ingestion_job rekord; PostGIS 3.5.3. A klaszter pem adatbázist is tartalmaz.
+- D: NTFS, kb. 41,3 GiB szabad. Használható mentés nem igazolt; a keresés nem teljes körű.
+- OUTPUT.md: felmérés, előfeltételek, mentés/restore-próba, leállított klasztermásolat terve, ellenőrzés és rollback. Előző jelentés: docs/outputs/SETUP-001.md.
+- A szolgáltatásokat, adatfájlokat, környezeti változókat és alkalmazáskódot nem módosítottuk; commit/push nem történt. A migráció külön jóváhagyásra vár.
 
 ### 2026-10-15 — SETUP-001
 

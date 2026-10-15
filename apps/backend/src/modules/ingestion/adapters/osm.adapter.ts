@@ -1,217 +1,153 @@
-import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
-import { DataAdapter, RawPOIData } from '../interfaces/data-adapter.interface';
+import { Injectable, Logger } from "@nestjs/common";
+import { DataAdapter, RawPOIData } from "../interfaces/data-adapter.interface";
 
-type OverpassElement = {
-  type: 'node' | 'way' | 'relation';
-  id: number;
-  lat?: number;
-  lon?: number;
-  center?: { lat: number; lon: number };
-  tags?: Record<string, string>;
-};
-
-type OverpassResponse = {
-  elements?: OverpassElement[];
-};
-
+/**
+ * OSM POI adapter using Overpass API.
+ * Per documentation: use for POI ingestion, keep separate source tracking.
+ * ODbL 1.0 license: do not merge/deduplicate with proprietary data.
+ *
+ * TODO: Replace with Geofabrik extract processing for better performance.
+ */
 @Injectable()
 export class OSMAdapter implements DataAdapter {
-  readonly name = 'osm_overpass_budapest';
-  readonly type = 'pois';
+  readonly name = "osm_overpass";
+  readonly type = "pois";
   private readonly logger = new Logger(OSMAdapter.name);
-  private readonly overpassApis = [
-    'https://overpass-api.de/api/interpreter',
-    'https://overpass.kumi.systems/api/interpreter',
-  ];
-  private readonly timeoutMs = 60000;
-  private readonly budapestBbox = '47.349,18.900,47.650,19.350';
-  private readonly perTileDelayMs = Number(process.env.OSM_REQUEST_DELAY_MS || '1500');
-  private readonly maxRetries = Number(process.env.OSM_MAX_RETRIES || '2');
-  private readonly maxRecords = Number(process.env.OSM_MAX_RECORDS || '800');
+  private readonly OVERPASS_API = "https://overpass-api.de/api/interpreter";
+  private readonly REQUEST_TIMEOUT = 60000;
 
   async fetchData(): Promise<RawPOIData[]> {
-    const all: RawPOIData[] = [];
-    const seen = new Set<string>();
-    const tiles = this.buildTiles(this.budapestBbox, 2, 2);
+    // Query for POIs in Debrecen area (lat/lon bounds)
+    // This is a simplified query for attractions, restaurants, accommodation
+    const query = this.buildOverpassQuery();
 
-    for (const tile of tiles) {
-      const payload = await this.fetchTile(tile);
-      const records = this.parseElements(payload.elements || []);
-      for (const record of records) {
-        if (seen.has(record.externalId)) continue;
-        seen.add(record.externalId);
-        all.push(record);
-        if (all.length >= this.maxRecords) {
-          this.logger.warn(`OSM record cap reached (${this.maxRecords}).`);
-          return all;
-        }
+    const controller = new AbortController();
+    const timeoutId = setTimeout(
+      () => controller.abort(),
+      this.REQUEST_TIMEOUT,
+    );
+
+    try {
+      this.logger.log("Fetching POI data from Overpass API");
+      const response = await fetch(this.OVERPASS_API, {
+        method: "POST",
+        body: query,
+        signal: controller.signal,
+        headers: {
+          "User-Agent":
+            "Momap/1.0 (+https://github.com/orig9511/magyarorszag-felfedezo)",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          `Overpass API error: ${response.status} ${response.statusText}`,
+        );
       }
-      await this.delay(this.perTileDelayMs);
+
+      const text = await response.text();
+      const pois = this.parseOverpassXML(text);
+      this.logger.log(`Fetched ${pois.length} POIs from Overpass`);
+      return pois;
+    } catch (error) {
+      this.logger.error(`Overpass fetch failed: ${error}`);
+      // Return empty array on error to allow partial ingestion
+      return [];
+    } finally {
+      clearTimeout(timeoutId);
     }
-    this.logger.log(`Fetched ${all.length} OSM records for Budapest.`);
-    return all;
   }
 
   validateRecord(record: RawPOIData): { valid: boolean; errors?: string[] } {
     const errors: string[] = [];
-    if (!record.externalId) errors.push('externalId required');
-    if (!record.osmType) errors.push('osmType required');
-    if (!record.osmId) errors.push('osmId required');
-    if (!record.name) errors.push('name required');
-    if (!record.category) errors.push('category required');
-    if (!record.settlement) errors.push('settlement required');
-    if (!Number.isFinite(record.latitude) || !Number.isFinite(record.longitude)) {
-      errors.push('valid coordinates required');
+
+    if (!record.externalId) errors.push("externalId required");
+    if (!record.name) errors.push("name required");
+    if (!record.category) errors.push("category required");
+    if (record.latitude === undefined || record.longitude === undefined) {
+      errors.push("latitude/longitude required");
     }
-    if (record.latitude < -90 || record.latitude > 90 || record.longitude < -180 || record.longitude > 180) {
-      errors.push('coordinates out of range');
-    }
-    return { valid: errors.length === 0, errors: errors.length > 0 ? errors : undefined };
+    if (!record.settlement) errors.push("settlement required");
+
+    return {
+      valid: errors.length === 0,
+      errors: errors.length > 0 ? errors : undefined,
+    };
   }
 
-  private buildOverpassQuery(bbox: string): string {
+  private buildOverpassQuery(): string {
+    // Query for Debrecen area (simplified bounds)
+    // TODO: Make this configurable per region
+    const bbox = "47.5,21.6,47.55,21.7"; // rough Debrecen area
+
     return `
-[out:json][timeout:45];
+[out:xml];
 (
-  nwr["tourism"~"attraction|museum|viewpoint|gallery|zoo|theme_park"](${bbox});
-  nwr["historic"~"castle|monument|memorial|archaeological_site|ruins|yes"](${bbox});
-  nwr["amenity"~"place_of_worship"](${bbox});
-  nwr["building"~"castle|church|cathedral|synagogue"](${bbox});
-  nwr["leisure"~"park|nature_reserve|garden"](${bbox});
-  nwr["natural"~"peak|spring|water|wood|cave_entrance"](${bbox});
+  node["amenity"~"restaurant|cafe|bar|pub|fast_food"](${bbox});
+  node["tourism"~"attraction|hotel|hostel|guest_house|museum"](${bbox});
+  node["historic"~"monument|castle|ruins|archaeological_site"](${bbox});
+  way["amenity"~"restaurant|cafe|bar|pub|fast_food"](${bbox});
+  way["tourism"~"attraction|hotel|hostel|guest_house|museum"](${bbox});
+  way["historic"~"monument|castle|ruins|archaeological_site"](${bbox});
 );
-out tags center;
+out center;
 `;
   }
 
-  private buildTiles(bbox: string, rows: number, cols: number): string[] {
-    const parts = bbox.split(',').map(Number);
-    const [minLat, minLng, maxLat, maxLng] = parts;
-    const latStep = (maxLat - minLat) / rows;
-    const lngStep = (maxLng - minLng) / cols;
-    const tiles: string[] = [];
-    for (let row = 0; row < rows; row++) {
-      for (let col = 0; col < cols; col++) {
-        const tileMinLat = minLat + row * latStep;
-        const tileMaxLat = row === rows - 1 ? maxLat : tileMinLat + latStep;
-        const tileMinLng = minLng + col * lngStep;
-        const tileMaxLng = col === cols - 1 ? maxLng : tileMinLng + lngStep;
-        tiles.push(`${tileMinLat},${tileMinLng},${tileMaxLat},${tileMaxLng}`);
-      }
-    }
-    return tiles;
-  }
+  private parseOverpassXML(xmlText: string): RawPOIData[] {
+    const pois: RawPOIData[] = [];
 
-  private async fetchTile(bbox: string): Promise<OverpassResponse> {
-    const query = this.buildOverpassQuery(bbox);
-    let lastError: Error | null = null;
-    for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
-      const endpoint = this.overpassApis[attempt % this.overpassApis.length];
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
-      try {
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          body: query,
-          signal: controller.signal,
-          headers: {
-            'Content-Type': 'text/plain; charset=utf-8',
-            'User-Agent': 'Momap/1.0 (+https://github.com/orig9511/magyarorszag-felfedezo)',
-          },
+    try {
+      // Simple regex-based parsing (XML library not available in basic NestJS)
+      // In production, use a proper XML parser like xml2js
+      const nodeMatches = xmlText.matchAll(
+        /<node id="(\d+)"[^>]*lat="([^"]+)"[^>]*lon="([^"]+)"[^>]*>(.*?)<\/node>/gs,
+      );
+
+      for (const match of nodeMatches) {
+        const osm_id = match[1];
+        const lat = parseFloat(match[2]);
+        const lon = parseFloat(match[3]);
+        const tagsXml = match[4];
+
+        const nameMatch = tagsXml.match(/<tag k="name" v="([^"]+)"/);
+        const name = nameMatch ? nameMatch[1] : `POI ${osm_id}`;
+
+        const categoryMatch = tagsXml.match(
+          /<tag k="(?:amenity|tourism|historic)" v="([^"]+)"/,
+        );
+        const category = categoryMatch ? categoryMatch[1] : "attraction";
+
+        const descriptionMatch = tagsXml.match(
+          /<tag k="description" v="([^"]+)"/,
+        );
+        const description = descriptionMatch ? descriptionMatch[1] : undefined;
+
+        const websiteMatch = tagsXml.match(/<tag k="website" v="([^"]+)"/);
+        const website = websiteMatch ? websiteMatch[1] : undefined;
+
+        const phoneMatch = tagsXml.match(/<tag k="phone" v="([^"]+)"/);
+        const phone = phoneMatch ? phoneMatch[1] : undefined;
+
+        pois.push({
+          externalId: `node/${osm_id}`,
+          name,
+          category,
+          latitude: lat,
+          longitude: lon,
+          settlement: "Debrecen", // TODO: geocode from coordinates
+          description,
+          website,
+          phone,
+          sourceUrl: `https://www.openstreetmap.org/node/${osm_id}`,
+          licenseType: "ODbL",
+          attribution: "OpenStreetMap contributors",
         });
-        if (!response.ok) {
-          const retryAfter = response.headers.get('retry-after');
-          const detail = retryAfter
-            ? `Overpass rate limit (${response.status}), retry-after: ${retryAfter}s`
-            : `Overpass request failed (${response.status} ${response.statusText})`;
-          throw new Error(detail);
-        }
-        return (await response.json()) as OverpassResponse;
-      } catch (error) {
-        lastError = error instanceof Error ? error : new Error(String(error));
-        this.logger.warn(`OSM tile fetch failed for ${bbox}, attempt ${attempt + 1}: ${lastError.message}`);
-        await this.delay(800 * (attempt + 1));
-      } finally {
-        clearTimeout(timeout);
       }
+    } catch (error) {
+      this.logger.error(`Failed to parse Overpass XML: ${error}`);
     }
-    throw new ServiceUnavailableException(`OpenStreetMap Overpass source unavailable: ${lastError?.message ?? 'Unknown error'}`);
-  }
 
-  private parseElements(elements: OverpassElement[]): RawPOIData[] {
-    const records: RawPOIData[] = [];
-    for (const element of elements) {
-      const tags = element.tags || {};
-      const name = tags.name || tags['name:hu'] || tags.official_name;
-      if (!name) {
-        continue;
-      }
-      const latitude = element.lat ?? element.center?.lat;
-      const longitude = element.lon ?? element.center?.lon;
-      if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-        continue;
-      }
-
-      const osmId = String(element.id);
-      const osmType = element.type;
-      const address = this.buildAddress(tags);
-      const altNames = this.collectAltNames(tags, name);
-      const wikidataQid = tags.wikidata;
-
-      records.push({
-        externalId: `${osmType}/${osmId}`,
-        name,
-        description: tags.description,
-        category: this.resolveCategory(tags),
-        latitude: latitude as number,
-        longitude: longitude as number,
-        settlement: tags['addr:city'] || tags['addr:town'] || tags['addr:village'] || 'Budapest',
-        osmType,
-        osmId,
-        wikidataQid,
-        altNames,
-        rawTags: tags,
-        externalRefs: wikidataQid ? { wikidata: wikidataQid } : undefined,
-        address,
-        phone: tags.phone || tags['contact:phone'],
-        website: tags.website || tags['contact:website'] || tags.url,
-        sourceUrl: `https://www.openstreetmap.org/${osmType}/${osmId}`,
-        licenseType: 'ODbL-1.0',
-        attribution: '© OpenStreetMap contributors',
-        importedAt: new Date(),
-      });
-    }
-    return records;
-  }
-
-  private resolveCategory(tags: Record<string, string>): string {
-    if (tags.historic === 'castle' || tags.building === 'castle') return 'castle';
-    if (tags.tourism === 'museum') return 'museum';
-    if (tags.tourism === 'viewpoint') return 'viewpoint';
-    if (tags.amenity === 'place_of_worship' || tags.building === 'church' || tags.building === 'cathedral') {
-      return 'church';
-    }
-    if (tags.leisure === 'park' || tags.leisure === 'nature_reserve') return 'park';
-    if (tags.natural) return `natural:${tags.natural}`;
-    if (tags.historic) return `historic:${tags.historic}`;
-    if (tags.tourism) return `tourism:${tags.tourism}`;
-    return 'tourism:attraction';
-  }
-
-  private buildAddress(tags: Record<string, string>): string | undefined {
-    const parts = [tags['addr:postcode'], tags['addr:city'], tags['addr:street'], tags['addr:housenumber']].filter(Boolean);
-    return parts.length > 0 ? parts.join(' ') : undefined;
-  }
-
-  private collectAltNames(tags: Record<string, string>, primaryName: string): string[] | undefined {
-    const candidates = [tags['name:hu'], tags['name:en'], tags.alt_name, tags.official_name]
-      .filter((value): value is string => Boolean(value))
-      .filter((value) => value !== primaryName);
-    return candidates.length > 0 ? [...new Set(candidates)] : undefined;
-  }
-
-  private async delay(ms: number): Promise<void> {
-    if (ms <= 0) return;
-    await new Promise((resolve) => setTimeout(resolve, ms));
+    return pois;
   }
 }

@@ -1,42 +1,38 @@
-# MOMAP – Munkajelentés
+﻿# MOMAP – BACKEND-CONFIG-001
 
-## Feladat
+Dátum: 2026-10-15. Branch: feature/initial-implementation.
+Státusz: COMPLETED a reprodukált .env-betöltési és hiányzó DATABASE_URL miatti SCRAM hibára. Teljes Nest/HTTP-integráció továbbra is UNVERIFIED.
 
-SETUP-001 – Codex Development Workflow
+## Reprodukált ok
 
-Dátum: 2026-10-15. Státusz: PARTIAL (a dokumentáció elkészült; a záró Git diff ellenőrzése blokkolt).
-Branch: `feature/initial-implementation`.
+A repository gyökerében lévő .env tartalmaz DATABASE_URL-t, a kapcsolati cél 127.0.0.1:5433/postgres, jelszóval. Az apps/backend/.env nem létezik. A ConfigModule eddig a relatív .env útvonalat használta; az npm workspace viszont apps/backend munkakönyvtárból indítja a backendet.
 
-## Eredmény és módosított fájlok
+VERIFIED reprodukció az apps/backend könyvtárból: ConfigModule.forRoot({envFilePath:'.env'}) után a DATABASE_URL nem töltődött be; a pg ConnectionParameters jelszava nem volt nemüres string, a port 5432-re esett vissza. A helyi pg/lib/crypto/sasl.js pontosan ilyen nem-string jelszónál dobja a jelentett SCRAM-SERVER-FIRST-MESSAGE hibát. A helyes Event meződefiníciók javítása ettől külön fordítási probléma volt.
 
-- `AGENTS.md`: feladatindítás, auditkorlát, jóváhagyási pontok, bizonyítékjelölések és jelentési folyamat.
-- `To-do.md`: a helyi origin referencia `049c60d` commitjából átvett feladatlista; fázispontosítás, SETUP-001 és auditellentmondások felvétele, történet frissítése.
-- `OUTPUT.md`: ez a jelentés, egyben a következő feladatok jelentésszerkezete.
+## Javítás és fájlok
 
-Alkalmazáskód és függőség nem változott. Új commit, push, deploy és adatbázisművelet nem történt.
+- apps/backend/src/environment.config.ts: az src/dist helyéből számolt abszolút apps/backend/.env, majd repository-root .env fallback. Nem függ az indítás munkakönyvtárától. A backend-local fájl elsőbbséget kap; a Nest meglévő process-env elsőbbsége megmarad.
+- apps/backend/src/app.module.ts: ezeket a fájlokat használja, a DATABASE_URL kötelező és PostgreSQL URL-ként ellenőrzött. Hiányzó értéknél érthető konfigurációs hiba lesz a jelszó nélküli driver-fallback helyett. A hibaszöveg soha nem tartalmazza a megadott URL-t/jelszót.
+- apps/backend/tests/environment-config.test.cjs: 4 regressziós teszt a tényleges lefordított helperrel és Nest loaderrel; szintetikus temp .env fixture, nincs valódi hitelesítő adat vagy DB a tesztekben. Fallback, local override, hiányzó URL és titkot nem visszaíró validáció vizsgálata.
+- To-do.md és OUTPUT.md frissítve; előző jelentés: docs/outputs/BACKEND-BUILD-001.md.
 
-## Ellenőrzés
+A valódi .env fájlt, jelszót, szolgáltatáskonfigurációt és tartós környezeti változókat nem módosítottuk. Nem történt migráció, synchronize indítás, dependency install, commit, push vagy deploy. A felhasználó már futó watch-folyamatának esetleges automatikus újraindulását nem vezéreltük.
 
-A Git-parancsoknál az adott hívásra érvényes `-c safe.directory=D:/Github/momap/magyarorszag-felfedezo` beállítást használtuk; globális Git-beállítás nem változott.
+## Ellenőrzések
 
-- VERIFIED: `git status --short --branch` – kezdetben tiszta munkafa, a helyi origin referenciához képest egy commit lemaradás.
-- VERIFIED: `git remote -v`, `git branch --show-current` – az elvárt repository és feature branch.
-- VERIFIED: `git diff --stat HEAD origin/feature/initial-implementation` – az átvétel előtt kizárólag `To-do.md`, 317 új sor.
-- VERIFIED: `git show origin/feature/initial-implementation:To-do.md` – a feladatlista olvasható.
-- VERIFIED: `git merge --ff-only origin/feature/initial-implementation` – sikeres, `cf2b05e` → `049c60d`; kizárólag dokumentáció.
-- VERIFIED: az Angular frontend manifestjében `maplibre-gl` szerepel; a frontend `test` script buildet futtat. Ez nem bizonyítja a térkép vagy tesztcsomag működését.
-- Build, alkalmazástesztek, böngészős próba: NOT RUN – dokumentációs hatókör.
-- VERIFIED: a záró `git status --short --branch` kizárólag a módosított `To-do.md`, valamint az új `AGENTS.md` és `OUTPUT.md` fájlokat mutatja.
-- BLOCKED: a záró `git diff --check` és `git diff --stat` hibája: `fatal: this operation must be run in a work tree`. Explicit `-C`, illetve `--git-dir`/`--work-tree` paraméterekkel is megismétlődött. A végső diffellenőrzés nem tekinthető sikeresnek.
+- npm.cmd run build -w apps/backend: PASS, exit 0.
+- node --test apps/backend/tests/environment-config.test.cjs apps/backend/tests/event-import-fields.test.cjs: PASS, 5/5 (4 új configteszt és az előző importmező-regresszió).
+- Az eredeti workspace-reprodukció a javított abszolút útvonalakkal: DATABASE_URL betöltődött, pg jelszó nemüres string, port 5433; PASS, exit 0. A process-env betöltés csak a külön tesztprocesszben történt.
+- Külön pg Client, a javított Nest-fájlbetöltésből kapott URL-lel: csatlakozás PASS; BEGIN READ ONLY; SELECT current_database(), inet_server_port(), current_setting('transaction_read_only'); ROLLBACK. Eredmény postgres / 5433 / on. Adatot író SQL nem futott; személyes rekord vagy jelszó nem került kiírásra.
+- Teljes NestFactory/HTTP/scheduler futtatás nem történt. A sikeres hitelesítés nem bizonyít teljes entitás/séma- és API-kompatibilitást. A korábban talált event viewport DTO/SRID hibák változatlanul külön feladatok.
 
-## Korlátok és nyitott kérdések
+## Újraindítás
 
-- UNVERIFIED: élő GitHub-frissesség; hálózati fetch/pull nem történt, helyi origin referenciát használtunk.
-- A szülő `D:/Github/momap` mappa nem Git-repozitórium; a tényleges repository a belső mappa. A Codex projekt megnyitásához ezt a belső mappát célszerű használni; az alkalmazás projektbeállítását nem módosítottuk.
-- A szülő AGENTS.md auditkövetelményei továbbra is alkalmazandók. A belső AGENTS.md önálló megnyitáskor is rögzíti az auditkorlátot.
-- A korábbi auditösszefoglalók licenc-, költség- és megvalósíthatósági állításait ebben a feladatban nem igazoltuk. A történeti dokumentumokból nem következik implementációs engedély.
-- A zárolt országos kezdőnézet és az eredeti szabad navigáció viszonyát a redesign terv jóváhagyása előtt tisztázni kell. A redesign teljes specifikációját ebben a feladatban nem másoltuk be a repositoryba.
+Ha a már futó watch nem töltötte újra a konfigurációt, állítsd le a saját backend termináljában Ctrl+C-vel, majd a repository gyökeréből:
 
-## Következő javasolt feladat
+```powershell
+Set-Location 'D:\Github\momap\magyarorszag-felfedezo'
+npm.cmd run dev -w apps/backend
+```
 
-P0-00/P0-01 – a meglévő kód és auditbizonyítékok áttekintése, az ellentmondások feltárása és az implementációs döntések jóváhagyásra előkészítése. Ez a javaslat önmagában nem indít új fejlesztési feladatot.
+Ez a teljes alkalmazást indítja, a meglévő development synchronize és ingestion viselkedéssel; a javítás ezeket nem változtatja meg. Nincs szükség jelszócserére vagy a .env fájl átmásolására.

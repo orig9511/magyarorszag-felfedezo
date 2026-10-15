@@ -1,20 +1,21 @@
-import { IsString, IsDateString, IsOptional, IsNumber, IsArray } from 'class-validator';
-import { Type } from 'class-transformer';
+import {
+  IsString,
+  IsDateString,
+  IsOptional,
+  IsNumber,
+  IsArray,
+} from "class-validator";
 
 export class GetEventsDto {
-  @Type(() => Number)
   @IsNumber()
   minLat!: number;
 
-  @Type(() => Number)
   @IsNumber()
   minLon!: number;
 
-  @Type(() => Number)
   @IsNumber()
   maxLat!: number;
 
-  @Type(() => Number)
   @IsNumber()
   maxLon!: number;
 
@@ -27,7 +28,6 @@ export class GetEventsDto {
   countyId?: string;
 
   @IsOptional()
-  @Type(() => Number)
   @IsNumber()
   days?: number; // Search events within N days from now
 }

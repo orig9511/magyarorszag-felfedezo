@@ -3,9 +3,10 @@ import type { StyleSpecification } from 'maplibre-gl';
 /**
  * Base map style, isolated here so the provider can be swapped without touching the map code.
  *
- * DEVELOPMENT ONLY: this uses the public OSMF raster tile server, whose usage policy does not
- * allow relying on it in production (see docs/research/04-geospatial-data-and-mapping.md §2.2).
- * The planned replacement is a self-hosted Protomaps/PMTiles Hungary extract with its own style.
+ * DEVELOPMENT CONFIGURATION: the public OSMF raster endpoint is best-effort, without an SLA.
+ * Commercial use is not categorically forbidden, but the tile policy must be followed.
+ * Production provider selection is pending; see docs/research/P0-map-provider-audit.md.
+ * Self-hosted Protomaps/PMTiles is a candidate, not an approved infrastructure decision.
  * Whatever replaces it must keep the attribution below (or the provider's own) visible.
  */
 export const MAP_STYLE: StyleSpecification = {

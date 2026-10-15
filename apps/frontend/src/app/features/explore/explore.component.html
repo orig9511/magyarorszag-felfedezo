@@ -1,176 +1,109 @@
-<div class="explore">
+﻿<div class="explore" [class.is-overview]="mode !== 'roam'">
   <header class="topbar">
-    <a class="brand" routerLink="/" aria-label="Momap, főoldal">
-      <lucide-icon [img]="icons.MapPin" [size]="24" [strokeWidth]="1.75"></lucide-icon>
-      <span>Momap</span>
-    </a>
-
+    <a class="brand" routerLink="/" aria-label="Momap, főoldal"><lucide-icon [img]="icons.MapPin" [size]="24"></lucide-icon><span>Momap</span></a>
     <form class="search" role="search" (submit)="$event.preventDefault(); searchCounty(q.value, q)">
       <label for="county-search" class="sr-only">Vármegye keresése</label>
-      <lucide-icon [img]="icons.Search" [size]="18" [strokeWidth]="1.75"></lucide-icon>
-      <input
-        #q
-        id="county-search"
-        type="search"
-        list="county-options"
-        placeholder="Keress vármegyét…"
-        autocomplete="off"
-        (focus)="activateCountyRandom()"
-        (click)="activateCountyRandom()"
-        (change)="searchCounty(q.value, q)"
-      />
-      <datalist id="county-options">
-        <option *ngFor="let c of counties" [value]="c.name"></option>
-      </datalist>
-      <button type="submit" class="go">Ugrás</button>
+      <input #q id="county-search" placeholder="Melyik vármegyét fedeznéd fel?" autocomplete="off" />
+      <button type="submit" class="go">Keresés</button>
     </form>
-
-    <a class="home" routerLink="/"><lucide-icon [img]="icons.ArrowLeft" [size]="18" [strokeWidth]="1.75"></lucide-icon>Főoldal</a>
+    <a class="home" routerLink="/">Inspirációk</a>
   </header>
-
-  <section class="chipbar" aria-label="Szűrők">
-    <span class="chip-label" aria-hidden="true"><lucide-icon [img]="icons.SlidersHorizontal" [size]="18" [strokeWidth]="1.75"></lucide-icon></span>
-    <div class="chips" role="group" aria-label="Kategóriák">
-      <button
-        *ngFor="let c of categoryOptions"
-        type="button"
-        class="chip"
-        [class.on]="hasCategory(c.key)"
-        [attr.aria-pressed]="hasCategory(c.key)"
-        (click)="toggleCategory(c.key, !hasCategory(c.key))"
-      >
-        <app-category-icon [category]="c.key" [size]="16" />
-        <span>{{ c.name }}</span>
-        <lucide-icon *ngIf="hasCategory(c.key)" class="tick" [img]="icons.Check" [size]="14" [strokeWidth]="2.25"></lucide-icon>
-      </button>
-    </div>
-
-    <span class="chip county-chip on" *ngIf="selectedCounty" (click)="activateCountyRandom()" (keydown.enter)="activateCountyRandom()" role="button" tabindex="0">
-      Vármegye: <strong>{{ selectedCounty.name }}</strong>
-      <button type="button" class="x" (click)="removeCounty()" [attr.aria-label]="selectedCounty.name + ' szűrő törlése'"><lucide-icon [img]="icons.X" [size]="14" [strokeWidth]="2"></lucide-icon></button>
-    </span>
-
-    <button type="button" class="reset" *ngIf="hasActiveFilters" (click)="resetFilters()"><lucide-icon [img]="icons.RotateCcw" [size]="16" [strokeWidth]="1.75"></lucide-icon>Szűrők törlése</button>
-    <p class="notice" *ngFor="let n of notices" role="status">{{ n }}</p>
-  </section>
-
   <div class="split" [class.view-map]="mobileView === 'map'" [class.view-list]="mobileView === 'list'">
-    <section class="results" aria-labelledby="results-title">
-      <div class="res-head">
-        <h1 id="results-title">
-          <ng-container *ngIf="poiState === 'ready'">{{ visibleCards.length }} kártya (max 20<span *ngIf="shouldRandomizeCards">, véletlenszerű</span>)</ng-container>
-          <ng-container *ngIf="poiState === 'loading'">Helyek betöltése…</ng-container>
-          <ng-container *ngIf="poiState === 'error'">Helyek</ng-container>
-        </h1>
-        <p>A lista a térkép látható területéhez igazodik. Mozgasd vagy nagyítsd a térképet.</p>
+    <section class="results" aria-label="Felfedezés és szűrők">
+      <div *ngIf="mode !== 'roam'" class="overview-copy">
+        <p class="eyebrow">Magyarország • Felfedezés</p>
+        <h1>{{ mode === 'transition' ? 'Indulunk…' : 'Hol kezdődjön a következő élmény?' }}</h1>
+        <p>Válassz egy elérhető vármegyét. Utána szabadon barangolhatsz az országban.</p>
       </div>
-
-      <ul class="poi-list" aria-live="polite">
-        <li *ngFor="let card of visibleCards" [id]="'card-' + card.kind + '-' + card.id">
-          <article
-            class="poi"
-            [class.is-selected]="selectedCard?.kind === card.kind && selectedCard?.id === card.id"
-            [class.is-event]="card.kind === 'event'"
-            (mouseenter)="hoverCard(card)"
-            (mouseleave)="hoverCard(null)"
-          >
-            <div class="thumb" [attr.data-cat]="card.category">
-              <span class="ph" aria-hidden="true">{{ categoryLabel(card.category).charAt(0) }}</span>
-            </div>
-            <div class="body">
-              <p class="cat">
-                {{ categoryLabel(card.category) }}
-                <span class="tag" *ngIf="card.sponsored">Szponzorált</span>
-                <span class="tag event" *ngIf="card.kind === 'event'">Esemény</span>
-              </p>
-              <h2>
-                <button type="button" class="poi-btn" (click)="selectCard(card, true)" [attr.aria-pressed]="selectedCard?.kind === card.kind && selectedCard?.id === card.id">{{ card.title }}</button>
-              </h2>
-              <p class="addr" *ngIf="card.kind === 'poi' && card.address">{{ card.address }}</p>
-              <p class="addr" *ngIf="card.kind === 'event'">{{ formatEventDate(card.startTime) }}<span *ngIf="card.venue"> · {{ card.venue }}</span></p>
-              <p class="desc" *ngIf="card.description">{{ card.description }}</p>
-            </div>
-          </article>
-        </li>
-      </ul>
-
-      <div class="state" *ngIf="poiState === 'loading' && !visibleCards.length"><p>Helyek betöltése…</p></div>
-      <div class="state error" *ngIf="poiState === 'error'" role="alert">
-        <p>A helyek nem tölthetők be. Fut a háttérszolgáltatás?</p>
-        <button type="button" (click)="retry()">Újrapróbálom</button>
+      <p class="notice" *ngIf="notice" role="status">{{ notice }}</p>
+      <p class="notice" *ngIf="countyError" role="alert">{{ countyError }}</p>
+      <div class="county-picker" *ngIf="mode !== 'roam'" aria-label="Vármegyeválasztás">
+        <button type="button" *ngFor="let county of counties" [disabled]="!county.active || mode === 'transition'" (click)="chooseCounty(county.id)">
+          {{ county.name }}<span *ngIf="!county.active"> · Hamarosan</span>
+        </button>
       </div>
-      <div class="state" *ngIf="poiState === 'ready' && visibleCards.length === 0">
-        <p *ngIf="!selectedCategories.size">Ebben a nézetben nincs találat. Mozgasd vagy nagyítsd a térképet, vagy tekintsd meg az egész országot.</p>
-        <p *ngIf="selectedCategories.size && elsewhereCount === 0">Ehhez a szűrőhöz még nincs adat az adatbázisban.</p>
-        <ng-container *ngIf="selectedCategories.size && elsewhereCount">
-          <p>Ebben a nézetben nincs találat, de az ország más részén {{ elsewhereCount }} hely van.</p>
-        </ng-container>
-        <p *ngIf="selectedCategories.size && elsewhereCount === null">Ebben a nézetben nincs találat.</p>
-        <button type="button" (click)="showWholeCountry()">Teljes ország mutatása</button>
-        <button type="button" *ngIf="hasActiveFilters" (click)="resetFilters()">Szűrők törlése</button>
-      </div>
-      <p class="credit" *ngIf="countyAttribution || countyError">
-        <span class="err" *ngIf="countyError">{{ countyError }} </span>Vármegyehatárok: {{ countyAttribution }}
-      </p>
+      <ng-container *ngIf="mode === 'roam'">
+        <section class="county-intro" *ngIf="selectedCounty && introVisible" aria-labelledby="county-title">
+          <button type="button" class="intro-close" (click)="dismissIntroduction()" aria-label="Vármegyeismertető bezárása">×</button>
+          <p class="eyebrow">Innen indul a felfedezés</p>
+          <h1 id="county-title">{{ selectedCounty.name }}</h1>
+          <p>{{ selectedCounty.description || 'Barangolj a térképen: a találatok a látható területhez igazodnak, a vármegyehatárokon túl is.' }}</p>
+          <h2>Helyek a közelben</h2>
+          <button type="button" class="intro-card" *ngFor="let card of introAttractions" (click)="selectCard(card, true)">{{ card.title }}</button>
+          <p class="muted" *ngIf="!introAttractions.length">Ebben a nézetben még nincs megjeleníthető hely.</p>
+          <h2>Közelgő események</h2>
+          <button type="button" class="intro-card" *ngFor="let card of introEvents" (click)="selectCard(card, true)">{{ card.title }} <small>{{ formatEventDate(card.startTime) }}</small></button>
+          <p class="muted" *ngIf="!introEvents.length">{{ eventError ? 'Az eseményadatok jelenleg nem érhetők el.' : 'Ebben a nézetben nincs megjeleníthető közelgő esemény.' }}</p>
+        </section>
+        <section class="discovery-filters" aria-label="Találatok szűrése">
+          <div class="type-tabs" role="group" aria-label="Találat típusa">
+            <button type="button" [attr.aria-pressed]="contentMode === 'all'" (click)="setContentMode('all')">Minden</button>
+            <button type="button" [attr.aria-pressed]="contentMode === 'pois'" (click)="setContentMode('pois')">Helyek</button>
+            <button type="button" [attr.aria-pressed]="contentMode === 'events'" (click)="setContentMode('events')">Események</button>
+          </div>
+          <div class="chips" role="group" aria-label="Helyek kategóriái" *ngIf="contentMode !== 'events'">
+            <button *ngFor="let c of categoryOptions" type="button" class="chip" [class.on]="hasCategory(c.key)" [attr.aria-pressed]="hasCategory(c.key)" (click)="toggleCategory(c.key, !hasCategory(c.key))">
+              <app-category-icon [category]="c.key" [size]="16" />{{ c.name }}
+            </button>
+          </div>
+          <div class="date-filters" *ngIf="showEventDateFilters" role="group" aria-label="Esemény dátuma">
+            <button type="button" [attr.aria-pressed]="eventDatePreset === 'today'" (click)="setEventDatePreset('today')">Ma</button>
+            <button type="button" [attr.aria-pressed]="eventDatePreset === 'tomorrow'" (click)="setEventDatePreset('tomorrow')">Holnap</button>
+            <button type="button" [attr.aria-pressed]="eventDatePreset === 'nextDays'" (click)="setEventDatePreset('nextDays')">Következő napok</button>
+            <button type="button" [attr.aria-pressed]="eventDatePreset === 'fixed'" (click)="setEventDatePreset('fixed')">Dátum</button>
+            <label *ngIf="eventDatePreset === 'nextDays'">Időtáv: {{ eventDaysWindow }} nap<input type="range" min="1" max="30" [value]="eventDaysWindow" (input)="onEventDaysWindowChange(+($any($event.target).value))" /></label>
+            <label *ngIf="eventDatePreset === 'fixed'">Esemény napja<input type="date" [value]="eventFixedDate" (change)="onFixedDateChange($any($event.target).value)" /></label>
+          </div>
+          <button type="button" class="reset" *ngIf="hasActiveFilters" (click)="resetFilters()">Szűrők törlése</button>
+        </section>
+        <div class="res-head" aria-live="polite">
+          <h2>{{ visibleCards.length }} találat</h2>
+          <p>{{ poiState === 'loading' ? 'Találatok frissítése…' : 'A lista és a jelölők ugyanazokat a térbeli találatokat mutatják.' }}</p>
+        </div>
+        <div class="state error" *ngIf="poiError || eventError" role="alert">
+          <p *ngIf="poiError">{{ poiError }}</p><p *ngIf="eventError">{{ eventError }}</p>
+          <button type="button" (click)="retry()">Újrapróbálom</button>
+        </div>
+        <ul class="poi-list" aria-label="Látható találatok">
+          <li *ngFor="let card of visibleCards | slice:0:resultLimit; trackBy: cardKey" [id]="'card-' + card.kind + '-' + card.id">
+            <article class="poi" [class.is-selected]="selectedCard?.id === card.id && selectedCard?.kind === card.kind" [class.is-event]="card.kind === 'event'" (mouseenter)="hoverCard(card)" (mouseleave)="hoverCard(null)">
+              <div class="thumb"><span class="ph" aria-hidden="true"><app-category-icon [category]="card.category" [size]="28" /></span></div>
+              <div class="body">
+                <p class="cat">{{ categoryLabel(card.category) }} <span class="tag" *ngIf="card.sponsored">Szponzorált</span></p>
+                <h2><button type="button" class="poi-btn" (click)="selectCard(card, true)" [attr.aria-pressed]="selectedCard?.id === card.id && selectedCard?.kind === card.kind">{{ card.title }}</button></h2>
+                <p class="addr" *ngIf="card.kind === 'event'">{{ formatEventDate(card.startTime) }}<span *ngIf="card.venue"> · {{ card.venue }}</span></p>
+                <p class="addr" *ngIf="card.address">{{ card.address }}</p><p class="desc" *ngIf="card.description">{{ card.description }}</p>
+              </div>
+            </article>
+          </li>
+        </ul>
+        <button type="button" class="show-more" *ngIf="visibleCards.length > resultLimit" (click)="showMore()">További találatok ({{ visibleCards.length - resultLimit }})</button>
+        <p class="state" *ngIf="poiState === 'ready' && !visibleCards.length && !poiError && !eventError">Itt most nincs találat. Mozgasd a térképet vagy módosítsd a szűrőket.</p>
+        <p class="muted result-note">A találatok a betöltött adatokból származnak. A helyek API-ja legfeljebb 1000 rekordot ad vissza.</p>
+      </ng-container>
+      <p class="credit">Vármegyehatárok: {{ countyAttribution || 'A forrásmegjelölés ellenőrzése folyamatban.' }}</p>
     </section>
-
     <section class="mapwrap" aria-label="Térkép">
-      <div #mapElement class="map" role="application" aria-label="Interaktív térkép: húzással mozgatható, görgetéssel nagyítható"></div>
-
-      <div class="map-tools">
-        <button type="button" (click)="showWholeCountry()"><lucide-icon [img]="icons.LocateFixed" [size]="16" [strokeWidth]="1.75"></lucide-icon>Teljes ország</button>
-        <button type="button" *ngIf="selectedCounty" (click)="removeCounty()">Vármegye törlése</button>
-      </div>
-
-      <aside class="event-date-panel" *ngIf="showEventDateFilters" role="group" aria-label="Esemény dátumszűrő">
-        <header>
-          <p>Eseményidő</p>
-          <small>{{ mapZoom >= 10 ? 'Közelített nézet' : 'Esemény kategória' }}</small>
-        </header>
-        <div class="preset-grid">
-          <button type="button" [class.on]="eventDatePreset === 'today'" (click)="setEventDatePreset('today')">Ma</button>
-          <button type="button" [class.on]="eventDatePreset === 'tomorrow'" (click)="setEventDatePreset('tomorrow')">Holnap</button>
-          <button type="button" [class.on]="eventDatePreset === 'nextDays'" (click)="setEventDatePreset('nextDays')">Következő napok</button>
-          <button type="button" [class.on]="eventDatePreset === 'fixed'" (click)="setEventDatePreset('fixed')">Fix dátum</button>
-        </div>
-        <div class="slider-wrap" *ngIf="eventDatePreset === 'nextDays'">
-          <label for="days-window">Időtáv: +{{ eventDaysWindow }} nap</label>
-          <input id="days-window" type="range" min="1" max="30" [value]="eventDaysWindow" (input)="onEventDaysWindowChange(+($any($event.target).value))" />
-        </div>
-        <div class="fixed-wrap" *ngIf="eventDatePreset === 'fixed'">
-          <label for="fixed-date">Dátum</label>
-          <input id="fixed-date" type="date" [value]="eventFixedDate" (change)="onFixedDateChange($any($event.target).value)" />
-        </div>
-      </aside>
-
-      <div class="map-notice" *ngIf="mapError" role="alert">A térkép nem érhető el: {{ mapError }}</div>
-
-      <aside class="detail" *ngIf="selectedCard" aria-label="Hely részletei">
-        <button type="button" class="close" (click)="closeDetail()" aria-label="Részletek bezárása"><lucide-icon [img]="icons.X" [size]="18" [strokeWidth]="1.75"></lucide-icon></button>
-        <p class="cat">
-          {{ categoryLabel(selectedCard.category) }}
-          <span class="tag" *ngIf="selectedCard.sponsored">Szponzorált</span>
-          <span class="tag event" *ngIf="selectedCard.kind === 'event'">Esemény</span>
-        </p>
-        <h2>{{ selectedCard.title }}</h2>
-        <p *ngIf="selectedCard.description">{{ selectedCard.description }}</p>
+      <div #mapElement class="map" [class.momap-navigation-locked]="mode !== 'roam'" role="region" tabindex="0" [attr.aria-label]="mode === 'roam' ? 'Szabadon mozgatható térkép. A találatok a listából is elérhetők.' : 'Magyarország áttekintés. Válassz vármegyét a térképen vagy a listában.'"></div>
+      <div class="overview-badge" *ngIf="mode !== 'roam'" role="status">{{ mode === 'transition' ? 'Közelítés a vármegyére…' : 'Válassz vármegyét a kezdéshez' }}</div>
+      <div class="map-tools" *ngIf="mode === 'roam'"><button type="button" (click)="showWholeCountry()">Magyarország áttekintés</button></div>
+      <div class="map-legend" *ngIf="mode === 'roam'"><span class="dot poi-dot"></span> Hely <span class="dot event-dot"></span> Esemény <span>• Csoport: kattints a nagyításhoz</span></div>
+      <div class="map-notice" *ngIf="mapError" role="alert">A térkép betöltési hibát jelzett. A vármegyeválasztás és a lista továbbra is használható.</div>
+      <aside class="detail" *ngIf="selectedCard" aria-label="Találat részletei">
+        <button type="button" class="close" (click)="closeDetail()" aria-label="Részletek bezárása">×</button>
+        <p class="cat">{{ categoryLabel(selectedCard.category) }} <span class="tag" *ngIf="selectedCard.sponsored">Szponzorált</span></p>
+        <h2>{{ selectedCard.title }}</h2><p *ngIf="selectedCard.description">{{ selectedCard.description }}</p>
         <dl>
-          <ng-container *ngIf="selectedCard.kind === 'poi' && selectedCard.address"><dt>Cím</dt><dd>{{ selectedCard.address }}</dd></ng-container>
-          <ng-container *ngIf="selectedCard.kind === 'poi' && selectedCard.phone"><dt>Telefon</dt><dd><a [href]="'tel:' + selectedCard.phone">{{ selectedCard.phone }}</a></dd></ng-container>
-          <ng-container *ngIf="selectedCard.kind === 'event' && selectedCard.startTime"><dt>Időpont</dt><dd>{{ formatEventDate(selectedCard.startTime) }}</dd></ng-container>
-          <ng-container *ngIf="selectedCard.kind === 'event' && selectedCard.venue"><dt>Helyszín</dt><dd>{{ selectedCard.venue }}</dd></ng-container>
-          <ng-container *ngIf="selectedCard.kind === 'event' && selectedCard.settlement"><dt>Település</dt><dd>{{ selectedCard.settlement }}</dd></ng-container>
-          <ng-container *ngIf="safeUrl(selectedCard.website)"><dt>Weboldal</dt><dd><a [href]="safeUrl(selectedCard.website)" target="_blank" rel="noopener noreferrer">{{ selectedCard.website }}</a></dd></ng-container>
-          <ng-container *ngIf="selectedCard.location"><dt>Koordináták</dt><dd>{{ selectedCard.location.coordinates[1].toFixed(5) }}, {{ selectedCard.location.coordinates[0].toFixed(5) }}</dd></ng-container>
+          <ng-container *ngIf="selectedCard.startTime"><dt>Időpont</dt><dd>{{ formatEventDate(selectedCard.startTime) }}</dd></ng-container>
+          <ng-container *ngIf="selectedCard.venue"><dt>Helyszín</dt><dd>{{ selectedCard.venue }}</dd></ng-container>
+          <ng-container *ngIf="selectedCard.address"><dt>Cím</dt><dd>{{ selectedCard.address }}</dd></ng-container>
+          <ng-container *ngIf="selectedCard.phone"><dt>Telefon</dt><dd><a [href]="'tel:' + selectedCard.phone">{{ selectedCard.phone }}</a></dd></ng-container>
+          <ng-container *ngIf="selectedCard.settlement"><dt>Település</dt><dd>{{ selectedCard.settlement }}</dd></ng-container>
+          <ng-container *ngIf="safeUrl(selectedCard.website)"><dt>Weboldal</dt><dd><a [href]="safeUrl(selectedCard.website)" target="_blank" rel="noopener noreferrer">Forrás megnyitása</a></dd></ng-container>
         </dl>
         <a class="osm" *ngIf="osmLink(selectedCard)" [href]="osmLink(selectedCard)" target="_blank" rel="noopener noreferrer">Megnyitás az OpenStreetMapon</a>
       </aside>
-
     </section>
   </div>
-
-  <div class="mobile-toggle">
-    <button type="button" *ngIf="mobileView === 'map'" (click)="setMobileView('list')"><lucide-icon [img]="icons.List" [size]="18" [strokeWidth]="2"></lucide-icon>Lista ({{ visibleCards.length }})</button>
-    <button type="button" *ngIf="mobileView === 'list'" (click)="setMobileView('map')"><lucide-icon [img]="icons.Map" [size]="18" [strokeWidth]="2"></lucide-icon>Térkép</button>
-  </div>
+  <div class="mobile-toggle"><button type="button" (click)="setMobileView(mobileView === 'map' ? 'list' : 'map')">{{ mobileView === 'map' ? (mode === 'roam' ? 'Találatok és szűrők' : 'Vármegyék listája') : 'Térkép' }}</button></div>
 </div>

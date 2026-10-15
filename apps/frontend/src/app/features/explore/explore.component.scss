@@ -135,3 +135,26 @@ h1, h2, p { margin: 0; }
     button { display: inline-flex; align-items: center; gap: 0.5rem; min-height: 3rem; padding: 0 1.6rem; border: 0; border-radius: 999px; background: $lime; color: $bg; font-weight: 700; font-size: 0.95rem; box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5); cursor: pointer; } }
   .detail { bottom: 7rem; max-height: 42%; }
 }
+/* Discovery controls stay in the same scrollable panel when the introduction is dismissed. */
+button:focus-visible, a:focus-visible { outline: 2px solid $lime; outline-offset: 4px; }
+.overview-copy { padding: 1rem 0 1.5rem; h1 { font-family: $serif; font-size: clamp(1.8rem, 3vw, 2.8rem); font-weight: 400; line-height: 1.12; margin: .7rem 0 1rem; } p { color: $muted; line-height: 1.6; } }
+.eyebrow { text-transform: uppercase; font-size: .7rem; letter-spacing: .16em; color: $lime; }
+.county-picker { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: .45rem;
+  button { padding: .7rem; min-height: 44px; border: 1px solid $line; border-radius: 8px; background: $surface; text-align: left; cursor: pointer; &:hover:not(:disabled) { border-color: $lime; } &:disabled { opacity: .5; cursor: default; } } }
+.county-intro { position: relative; margin-bottom: 1rem; padding: 1rem; border: 1px solid rgba(198,240,90,.3); border-radius: 12px; background: linear-gradient(135deg, #193023, $surface);
+  h1 { font-family: $serif; font-size: 2rem; font-weight: 400; margin: .5rem 2rem .6rem 0; } p { font-size: .87rem; line-height: 1.5; } h2 { font-size: .85rem; margin: 1rem 0 .45rem; } }
+.intro-close { position: absolute; top: .4rem; right: .4rem; width: 44px; height: 44px; font-size: 1.6rem; border: 0; background: transparent; cursor: pointer; }
+.intro-card { display: block; width: 100%; text-align: left; padding: .6rem; margin-top: .3rem; background: rgba(0,0,0,.2); border: 1px solid $line; border-radius: 6px; cursor: pointer; small { display: block; color: $muted; margin-top: .3rem; } }
+.discovery-filters { padding-bottom: 1rem; margin-bottom: 1rem; border-bottom: 1px solid $line; .chips { flex-wrap: wrap; gap: .4rem; margin-top: .75rem; } .chip { min-height: 44px; font-size: .78rem; padding: .4rem .6rem; } }
+.type-tabs, .date-filters { display: flex; flex-wrap: wrap; gap: .4rem;
+  button { min-height: 44px; border: 1px solid $line; background: $surface; border-radius: 8px; padding: .5rem .7rem; cursor: pointer; &[aria-pressed='true'] { border-color: $lime; color: $lime; } } }
+.date-filters { margin-top: .8rem; font-size: .8rem; label { display: grid; gap: .5rem; flex: 1 0 100%; color: $muted; } input { color-scheme: dark; background: $surface; color: $text; accent-color: $lime; min-height: 36px; border: 1px solid $line; border-radius: 6px; } }
+.res-head h2 { font-size: 1.3rem; font-family: $serif; font-weight: 400; }
+.muted { color: $muted; font-size: .8rem; line-height: 1.5; }
+.result-note { margin-top: 1rem; }
+.show-more { margin-top: 1rem; padding: .8rem; width: 100%; background: $surface; border: 1px solid $lime; border-radius: 8px; cursor: pointer; }
+.overview-badge { position: absolute; top: 1rem; left: 50%; transform: translateX(-50%); background: rgba(7,11,9,.93); border: 1px solid $line; border-radius: 999px; padding: .7rem 1rem; font-size: .85rem; text-align: center; pointer-events: none; }
+.map-legend { position: absolute; bottom: 2rem; left: .75rem; display: flex; gap: .4rem; align-items: center; flex-wrap: wrap; max-width: calc(100% - 5rem); padding: .4rem .6rem; background: rgba(7,11,9,.9); border-radius: 6px; font-size: .7rem; pointer-events: none; }
+.dot { height: 8px; width: 8px; border-radius: 50%; display: inline-block; }.poi-dot { background: $lime; }.event-dot { background: #93c7ff; }
+.notice { white-space: normal; margin-bottom: .75rem; }
+@media (max-width: 900px) { .results { padding-bottom: 6rem; } .map-legend { bottom: 1.6rem; font-size: .65rem; } .overview-badge { width: max-content; max-width: 80%; } }

@@ -7,28 +7,23 @@ import { EventModule } from "./modules/event/event.module";
 import { SettlementModule } from "./modules/settlement/settlement.module";
 import { IngestionModule } from "./modules/ingestion/ingestion.module";
 import { AdminModule } from "./modules/admin/admin.module";
+import { environmentFiles, requireDatabaseUrl } from "./environment.config";
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: ['.env', '../../.env'],
+      envFilePath: environmentFiles,
     }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
-      useFactory: (configService: ConfigService) => {
-        const databaseUrl = configService.get<string>('DATABASE_URL');
-        if (!databaseUrl) {
-          throw new Error('DATABASE_URL environment variable is required for backend startup.');
-        }
-        return {
-          type: "postgres" as const,
-          url: databaseUrl,
-          entities: [__dirname + "/**/*.entity{.ts,.js}"],
-          synchronize: process.env.NODE_ENV === "development",
-          logging: process.env.NODE_ENV === "development",
-        };
-      },
+      useFactory: (configService: ConfigService) => ({
+        type: "postgres",
+        url: requireDatabaseUrl(configService.get("DATABASE_URL")),
+        entities: [__dirname + "/**/*.entity{.ts,.js}"],
+        synchronize: process.env.NODE_ENV === "development",
+        logging: process.env.NODE_ENV === "development",
+      }),
       inject: [ConfigService],
     }),
     POIModule,

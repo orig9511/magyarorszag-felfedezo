@@ -138,30 +138,9 @@ curl -X POST http://localhost:3000/api/ingestion/run?source=osm
 # Run Wikidata ingestion
 curl -X POST http://localhost:3000/api/ingestion/run?source=wikidata
 
-# Run Ticketmaster ingestion (requires TICKETMASTER_API_KEY)
-curl -X POST http://localhost:3000/api/ingestion/run?source=ticketmaster
-
 # View job history
 curl http://localhost:3000/api/ingestion/history?source=osm&limit=5
 ```
-
-### CLI imports
-
-```bash
-# POI import from OSM (Budapest pilot)
-npm run import:pois -w apps/backend -- --source=osm
-
-# POI enrichment from Wikidata
-npm run import:pois -w apps/backend -- --source=wikidata
-
-# Event import from JSON
-npm run import:events -w apps/backend -- --file=apps/backend/scripts/samples/events-sample.json --format=json --source=manual_json --allow-test-data
-
-# Event import from CSV
-npm run import:events -w apps/backend -- --file=apps/backend/scripts/samples/events-sample.csv --format=csv --source=manual_csv --allow-test-data
-```
-
-> A `scripts/samples` fájlok kizárólag teszt minták (`isTestData=true`), éles adatforrásnak ne használd őket.
 
 ### Logs & Monitoring
 
@@ -176,14 +155,6 @@ Environment variables (`.env`):
 ```
 DATABASE_URL=postgresql://user:pass@postgres:5432/momap
 NODE_ENV=development
-TICKETMASTER_API_KEY=your_key_here
-TICKETMASTER_COUNTRY_CODE=HU
-TICKETMASTER_MAX_PAGES=3
-INGEST_MIN_INTERVAL_MINUTES=30
-INGEST_MAX_ITEMS_PER_RUN=800
-OSM_MAX_RECORDS=800
-OSM_REQUEST_DELAY_MS=1500
-OSM_MAX_RETRIES=2
 ```
 
 Scheduled jobs are hardcoded in `IngestionScheduler`; modify cron times as needed.
