@@ -3,7 +3,16 @@
 **Project:** Magyarországi térképes felfedező- és turisztikai platform  
 **Repository:** orig9511/magyarorszag-felfedezo  
 **Development branch:** feature/initial-implementation  
-**Last updated:** 2026-10-12
+**Last updated:** 2026-10-15
+
+## Aktuális munkafázis és elsőbbség
+
+Audit és dokumentáció. Az alábbi korábbi technológiai és termékdöntések történeti kontextust adnak; az audit és az implementációs terv kifejezett jóváhagyását nem helyettesítik. A meglévő alkalmazás működése külön ellenőrzést igényel. A redesign prompt későbbi specifikáció, jelenleg nem végrehajtandó feladat.
+
+- [ ] SETUP-001 – PARTIAL: a dokumentációs munkafolyamat elkészült; záró Git diff ellenőrzése blokkolt. Részletek: OUTPUT.md.
+- [ ] P0-00 – Auditbizonyítékok és dokumentációs ellentmondások felülvizsgálata (Leaflet/MapLibre; szabad kezdőnézet/zárolt országos nézet; korábbi licenc- és költségállítások).
+
+A következő javasolt feladat P0-00/P0-01. MAP- és DATA-implementáció az audit és a terv jóváhagyása után indulhat. Commit és push külön jóváhagyást igényel.
 
 ---
 
@@ -274,6 +283,14 @@ After every development task, provide:
 ---
 
 ## 8. DEVELOPMENT HISTORY
+
+### 2026-10-15 — SETUP-001
+
+- VERIFIED: a helyi Git gyökér `D:/Github/momap/magyarorszag-felfedezo`, remote-ja és branche megfelel az elvárt projektnek; a kezdeti munkafa tiszta volt.
+- A helyi origin referencia egy dokumentációs commitját fast-forward módszerrel átvettük: `cf2b05e` → `049c60d`; kizárólag a meglévő `To-do.md` került be.
+- Elkészült az `AGENTS.md` munkafolyamat és az `OUTPUT.md` jelentés; ez dokumentációs próbamunka, alkalmazáskód-módosítás nélkül.
+- UNVERIFIED: az élő GitHub állapota (fetch nem történt), futásidejű működés és auditállítások.
+- Következő javaslat: P0-00/P0-01. Commit/push nem történt.
 
 ### 2026-10-12 — PM-001
 
