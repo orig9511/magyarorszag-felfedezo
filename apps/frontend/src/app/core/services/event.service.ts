@@ -1,6 +1,6 @@
-import { Injectable } from '@angular/core';
-import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Injectable } from "@angular/core";
+import { HttpClient, HttpParams } from "@angular/common/http";
+import { Observable } from "rxjs";
 
 export interface Event {
   id: string;
@@ -22,10 +22,10 @@ export interface Event {
 }
 
 @Injectable({
-  providedIn: 'root',
+  providedIn: "root",
 })
 export class EventService {
-  private baseUrl = '/api/events';
+  private baseUrl = "/api/events";
 
   constructor(private http: HttpClient) {}
 
@@ -37,25 +37,31 @@ export class EventService {
     minLon: number,
     maxLat: number,
     maxLon: number,
-    options?: { categories?: string[]; countyId?: string; days?: number; dateFrom?: string; dateTo?: string },
+    options?: {
+      categories?: string[];
+      countyId?: string;
+      days?: number;
+      dateFrom?: string;
+      dateTo?: string;
+    },
   ): Observable<Event[]> {
     let params = new HttpParams()
-      .set('minLat', minLat.toString())
-      .set('minLon', minLon.toString())
-      .set('maxLat', maxLat.toString())
-      .set('maxLon', maxLon.toString());
+      .set("minLat", minLat.toString())
+      .set("minLon", minLon.toString())
+      .set("maxLat", maxLat.toString())
+      .set("maxLon", maxLon.toString());
 
     if (options?.categories && options.categories.length > 0) {
-      params = params.set('categories', options.categories.join(','));
+      params = params.set("categories", options.categories.join(","));
     }
     if (options?.countyId) {
-      params = params.set('countyId', options.countyId);
+      params = params.set("countyId", options.countyId);
     }
     if (options?.days) {
-      params = params.set('days', options.days.toString());
+      params = params.set("days", options.days.toString());
     }
-    if (options?.dateFrom) params = params.set('dateFrom', options.dateFrom);
-    if (options?.dateTo) params = params.set('dateTo', options.dateTo);
+    if (options?.dateFrom) params = params.set("dateFrom", options.dateFrom);
+    if (options?.dateTo) params = params.set("dateTo", options.dateTo);
 
     return this.http.get<Event[]>(`${this.baseUrl}/viewport`, { params });
   }
@@ -65,7 +71,7 @@ export class EventService {
    */
   getUpcomingEvents(countyId: string, days = 7): Observable<Event[]> {
     return this.http.get<Event[]>(`${this.baseUrl}/upcoming/${countyId}`, {
-      params: new HttpParams().set('days', days.toString()),
+      params: new HttpParams().set("days", days.toString()),
     });
   }
 
@@ -81,8 +87,8 @@ export class EventService {
    */
   getAllEvents(limit = 50, offset = 0): Observable<Event[]> {
     const params = new HttpParams()
-      .set('limit', limit.toString())
-      .set('offset', offset.toString());
+      .set("limit", limit.toString())
+      .set("offset", offset.toString());
     return this.http.get<Event[]>(this.baseUrl, { params });
   }
 
