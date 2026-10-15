@@ -298,3 +298,33 @@ test('pin category colors maintain readable dark pictograms',()=>{
  const luminance=hex=>{const colors=hex.replace('#','').match(/../g).map(c=>parseInt(c,16)/255).map(c=>c<=.04045?c/12.92:((c+.055)/1.055)**2.4);return .2126*colors[0]+.7152*colors[1]+.0722*colors[2];};
  const ink=luminance('#101c17');for(const entry of Object.values(visuals.CATEGORY_VISUALS))assert.ok((luminance(entry.color)+.05)/(ink+.05)>=4.5,entry.key+' must have at least 4.5:1 contrast');
 });
+
+test('event calendar API contract uses Budapest dates, exact tomorrow/fixed ranges and unrestricted any',()=>{
+ const h=harness(), c=h.component, now=new Date('2026-10-24T22:30:00Z');
+ c.eventDatePreset='today';assert.deepEqual(c.getEventDateOptions(now),{dateFrom:'2026-10-25',dateTo:'2026-10-25'});
+ c.eventDatePreset='tomorrow';assert.deepEqual(c.getEventDateOptions(now),{dateFrom:'2026-10-26',dateTo:'2026-10-26'});
+ c.eventDatePreset='nextDays';c.eventDaysWindow=7;assert.deepEqual(c.getEventDateOptions(now),{dateFrom:'2026-10-25',dateTo:'2026-10-31'});
+ c.eventDatePreset='fixed';c.eventFixedDate='2030-01-01';assert.deepEqual(c.getEventDateOptions(now),{dateFrom:'2030-01-01',dateTo:'2030-01-01'});
+ c.eventDatePreset='any';assert.deepEqual(c.getEventDateOptions(now),{});c.ngOnDestroy();
+});
+test('Angular EventService serializes viewport, calendar dates and multiple categories with real HttpParams',async()=>{
+ await import('@angular/compiler');
+ const {HttpParams}=await import('@angular/common/http');
+ const {EventService}=load('apps/frontend/src/app/core/services/event.service.ts',{
+  '@angular/core':angular,'@angular/common/http':{HttpParams},
+ });
+ let request;
+ const service=new EventService({get(url,options){request={url,params:options.params};return rx.of([])}});
+ service.getEventsByViewport(45,16,49,23,{dateFrom:'2026-10-16',dateTo:'2026-10-16',categories:['concert','festival']});
+ assert.equal(request.url,'/api/events/viewport');
+ assert.deepEqual(Object.fromEntries(new URLSearchParams(request.params.toString())),{
+  minLat:'45',minLon:'16',maxLat:'49',maxLon:'23',categories:'concert,festival',dateFrom:'2026-10-16',dateTo:'2026-10-16',
+ });
+});
+test('API-approved multi-day event survives Today integration and shares blue map/sidebar representation',()=>clock(s=>{
+ const event={id:'multi-day',title:'Synthetic multi-day',category:'festival',startTime:'2020-01-01T12:00:00Z',endTime:'2099-01-01T12:00:00Z',location:{type:'Point',coordinates:[19,47]},countyId:'county-a'};
+ const h=harness(undefined,()=>rx.of([event]));h.component.setEventDatePreset('today');h.roam();
+ s.schedule(()=>{const card=h.component.visibleCards.find(c=>c.kind==='event');assert.ok(card);assert.equal(card.category,'event');
+  assert.deepEqual(h.calls.places.at(-1),h.component.visibleCards);assert.equal(h.calls.event[0][4].dateFrom,h.calls.event[0][4].dateTo);
+  assert.equal(h.calls.poi.length,1);h.component.ngOnDestroy();},401);
+}));

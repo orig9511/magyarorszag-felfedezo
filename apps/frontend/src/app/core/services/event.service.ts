@@ -37,7 +37,7 @@ export class EventService {
     minLon: number,
     maxLat: number,
     maxLon: number,
-    options?: { categories?: string[]; countyId?: string; days?: number },
+    options?: { categories?: string[]; countyId?: string; days?: number; dateFrom?: string; dateTo?: string },
   ): Observable<Event[]> {
     let params = new HttpParams()
       .set('minLat', minLat.toString())
@@ -54,6 +54,8 @@ export class EventService {
     if (options?.days) {
       params = params.set('days', options.days.toString());
     }
+    if (options?.dateFrom) params = params.set('dateFrom', options.dateFrom);
+    if (options?.dateTo) params = params.set('dateTo', options.dateTo);
 
     return this.http.get<Event[]>(`${this.baseUrl}/viewport`, { params });
   }

@@ -1,8 +1,8 @@
 import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, MoreThan, LessThan, In } from "typeorm";
+import { Repository } from "typeorm";
 import { Event } from "./event.entity";
-import { GetEventsDto } from "./dto/get-events.dto";
+import { eventDateRange } from "./event-date-range";
 
 @Injectable()
 export class EventService {
@@ -21,14 +21,18 @@ export class EventService {
     maxLon: number,
     categories?: string[],
     countyId?: string,
-    fromDate?: Date,
-    toDate?: Date,
+    fromDate?: string,
+    toDate?: string,
   ): Promise<Event[]> {
     let query = this.eventRepo
       .createQueryBuilder("event")
+      // Return actual instants from the existing Budapest wall-clock columns,
+      // independently of the timezone of the Node/PostgreSQL host.
+      .addSelect("event.startTime AT TIME ZONE 'Europe/Budapest'", 'event_startTime')
+      .addSelect("event.endTime AT TIME ZONE 'Europe/Budapest'", 'event_endTime')
       .where("event.status = :status", { status: "active" })
       .andWhere(
-        `ST_Intersects(event.location, ST_MakeBox2D(ST_Point(:minLon, :minLat), ST_Point(:maxLon, :maxLat)))`,
+        `ST_Intersects(event.location, ST_MakeEnvelope(:minLon, :minLat, :maxLon, :maxLat, 4326))`,
         {
           minLat,
           minLon,
@@ -38,7 +42,7 @@ export class EventService {
       );
 
     if (categories && categories.length > 0) {
-      query = query.andWhere("event.category IN (:categories)", { categories });
+      query = query.andWhere("event.category IN (:...categories)", { categories });
     }
 
     if (countyId) {
@@ -46,11 +50,11 @@ export class EventService {
     }
 
     if (fromDate) {
-      query = query.andWhere("event.endTime >= :fromDate", { fromDate });
+      query = query.andWhere("(COALESCE(event.endTime, event.startTime) > :fromDate OR event.startTime >= :fromDate)", { fromDate });
     }
 
     if (toDate) {
-      query = query.andWhere("event.startTime <= :toDate", { toDate });
+      query = query.andWhere("event.startTime < :toDate", { toDate });
     }
 
     return query.orderBy("event.startTime", "ASC").getMany();
@@ -60,18 +64,15 @@ export class EventService {
    * Get upcoming events for a county.
    */
   async getUpcomingEvents(countyId: string, days = 7): Promise<Event[]> {
-    const now = new Date();
-    const futureDate = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
-
-    return this.eventRepo.find({
-      where: {
-        countyId,
-        status: "active",
-        startTime: MoreThan(now),
-        endTime: LessThan(futureDate),
-      },
-      order: { startTime: "ASC" },
-    });
+    const { fromDate, toDate } = eventDateRange({ days });
+    return this.eventRepo.createQueryBuilder('event')
+      .addSelect("event.startTime AT TIME ZONE 'Europe/Budapest'", 'event_startTime')
+      .addSelect("event.endTime AT TIME ZONE 'Europe/Budapest'", 'event_endTime')
+      .where('event.status = :status', { status: 'active' })
+      .andWhere('event.countyId = :countyId', { countyId })
+      .andWhere('(COALESCE(event.endTime, event.startTime) > :fromDate OR event.startTime >= :fromDate)', { fromDate })
+      .andWhere('event.startTime < :toDate', { toDate })
+      .orderBy('event.startTime', 'ASC').getMany();
   }
 
   /**

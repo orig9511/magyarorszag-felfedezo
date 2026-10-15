@@ -169,11 +169,12 @@ export class ExploreComponent implements OnInit, AfterViewInit, OnDestroy {
       this.eventLoading = true;
       return timer(400).pipe(switchMap(() => {
         const v = { ...this.viewport! };
-        const key = viewportKey(v, [this.eventDatePreset, this.eventDaysWindow, this.eventFixedDate]);
+        const dateOptions = this.getEventDateOptions();
+        const key = viewportKey(v, [this.eventDatePreset, JSON.stringify(dateOptions)]);
         const cached = this.eventCache.get(key);
         if (cached && Date.now() - cached.at < 60000) return of(cached.cards);
-        return this.eventService.getEventsByViewport(v.minLat, v.minLng, v.maxLat, v.maxLng, { days: this.getEventDays() }).pipe(
-          map(events => visiblePlaces(this.filterEvents(events).map(e => this.eventToCard(e)), v)),
+        return this.eventService.getEventsByViewport(v.minLat, v.minLng, v.maxLat, v.maxLng, dateOptions).pipe(
+          map(events => visiblePlaces(events.map(e => this.eventToCard(e)), v)),
           tap(cards => this.cacheCards(this.eventCache, key, cards)),
           catchError(() => { this.eventError = 'Az események nem tölthetők be. Próbáld újra.'; return of([] as ExploreCard[]); }),
         );
@@ -230,19 +231,19 @@ export class ExploreComponent implements OnInit, AfterViewInit, OnDestroy {
   setEventDatePreset(preset: DatePreset) { this.eventDatePreset = preset; if (preset !== 'fixed') this.eventFixedDate = ''; this.eventReload$.next(); }
   onEventDaysWindowChange(days: number) { this.eventDaysWindow = Math.max(1, Math.min(30, days)); this.eventDatePreset = 'nextDays'; this.eventReload$.next(); }
   onFixedDateChange(value: string) { this.eventFixedDate = value; this.eventDatePreset = value ? 'fixed' : 'any'; this.eventReload$.next(); }
-  private getEventDays() { return this.eventDatePreset === 'today' ? 1 : this.eventDatePreset === 'tomorrow' ? 2 : this.eventDatePreset === 'nextDays' ? this.eventDaysWindow : 60; }
   private dateOnly(date: Date) { return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Budapest', year: 'numeric', month: '2-digit', day: '2-digit' }).format(date); }
-  private filterEvents(events: AppEvent[]) {
-    const now = new Date(), today = this.dateOnly(now);
-    const tomorrow = this.dateOnly(new Date(now.getTime() + 86400000));
-    return events.filter(e => {
-      const start = new Date(e.startTime); if (!Number.isFinite(start.getTime())) return false;
-      const day = this.dateOnly(start);
-      if (this.eventDatePreset === 'today') return day === today;
-      if (this.eventDatePreset === 'tomorrow') return day === tomorrow;
-      if (this.eventDatePreset === 'fixed' && this.eventFixedDate) return day === this.eventFixedDate;
-      return true;
-    });
+  private getEventDateOptions(now = new Date()): { dateFrom?: string; dateTo?: string } {
+    if (this.eventDatePreset === 'any') return {};
+    const today = this.dateOnly(now);
+    const addDays = (day: string, count: number) => {
+      const date = new Date(`${day}T00:00:00Z`);
+      date.setUTCDate(date.getUTCDate() + count);
+      return date.toISOString().slice(0, 10);
+    };
+    const from = this.eventDatePreset === 'fixed' ? this.eventFixedDate :
+      this.eventDatePreset === 'tomorrow' ? addDays(today, 1) : today;
+    if (!from) return {};
+    return { dateFrom: from, dateTo: this.eventDatePreset === 'nextDays' ? addDays(from, this.eventDaysWindow - 1) : from };
   }
   private poiToCard(p: Poi): ExploreCard { return { kind: 'poi', id: p.id, title: p.name, category: p.category, description: p.description,
     sponsored: p.sponsored, source: p.source, website: p.website, address: p.address, phone: p.phone, location: p.location, countyId: p.countyId, imageUrl: p.imageUrl }; }

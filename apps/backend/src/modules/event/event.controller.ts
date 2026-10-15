@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Patch, Param, Body, Query } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Param, Body, Query, BadRequestException } from '@nestjs/common';
+import { eventDateRange } from './event-date-range';
 import { EventService } from './event.service';
 import { GetEventsDto } from './dto/get-events.dto';
 import { CreateEventDto } from './dto/create-event.dto';
@@ -13,9 +14,11 @@ export class EventController {
    */
   @Get('viewport')
   async getByViewport(@Query() query: GetEventsDto) {
-    const fromDate = query.days ? new Date() : undefined;
-    const toDate = query.days ? new Date(Date.now() + query.days * 24 * 60 * 60 * 1000) : undefined;
-    const categories = query.categories ? query.categories.split(',') : undefined;
+    if (query.minLat >= query.maxLat || query.minLon >= query.maxLon) {
+      throw new BadRequestException('Viewport minimums must be less than maximums; wrapped bounds are unsupported');
+    }
+    const { fromDate, toDate } = eventDateRange(query);
+    const categories = query.categories ? [...new Set(query.categories.split(',').map(value => value.trim()))] : undefined;
 
     return this.eventService.getEventsByViewport(
       query.minLat,
@@ -35,7 +38,7 @@ export class EventController {
    */
   @Get('upcoming/:countyId')
   async getUpcoming(@Param('countyId') countyId: string, @Query('days') days?: string) {
-    const daysNum = days ? parseInt(days, 10) : 7;
+    const daysNum = days === undefined ? 7 : typeof days === 'string' && /^\d+$/.test(days) ? Number(days) : NaN;
     return this.eventService.getUpcomingEvents(countyId, daysNum);
   }
 

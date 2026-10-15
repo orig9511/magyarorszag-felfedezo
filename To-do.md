@@ -10,14 +10,14 @@
 - [x] MAP-REFINE-001-DATE – POI/event várakozás és cache szétválasztva; dátumváltás csak eseményt kér újra, Places-only dátumkontroll rejtett. Reprodukált frontend-kapcsolási hibák regressziói PASS; az eredeti browser-látvány nem reprodukált.
 - [x] MAP-REFINE-001-MASK – Teljes Polygon/MultiPolygon unió és world-minus-coverage maszk, belső gyűrűk és szigetek megőrzésével; szintetikus és jelenlegi API-geometriás ellenőrzés PASS. GPU-látvány még UNVERIFIED.
 - [ ] MAP-REFINE-001-UX – PARTIAL: központi kategóriapaletta, hozzáférhető ikonos pinek/klasztergombok, ponthoz kötött popup, sidebar/legend/intro finomítás kész. 35 frontend-regressziós teszt és production build PASS; tényleges browser/touch/screen-reader elfogadás hátravan.
-- [ ] MAP-REFINE-001-API – JÓVÁHAGYÁSRA VÁR: az élő event viewport days=1 és days=7 esetén is 400-as számvalidációs hibát ad; a korábban feltárt SRID-eltérés is megvan. Backend módosítás nem történt, külön engedély szükséges.
+- [x] MAP-REFINE-001-API – A külön engedélyezett MAP-BACKEND-001 javította a számvalidációt, SRID-t, dátum- és kategóriaszűrést; élő backend/proxy HTTP 200, 49 offline + 1 read-only HTTP/DB teszt PASS. Vizuális elfogadás külön nyitott.
 
-Aktuális bizonyítékok és korlátok: OUTPUT.md és docs/research/MAP-REFINE-001-findings.md. A 2026-10-15-i jelen kérés csak frontendfinomítást engedélyez; DB, séma, ingestion és backendadat változatlan.
+Aktuális bizonyítékok: OUTPUT.md és docs/outputs/MAP-BACKEND-001.md. A legutóbbi MAP-BACKEND-001 kérés engedélyezte a backend/frontend kódjavítást; DB-, séma-, ingestion- és titokmódosítást továbbra sem. A korábbi frontend-only korlát ennek a feladatnak a kódhatókörére már nem érvényes.
 
 - [x] DB-001 – Read-only PostgreSQL-felmérés és biztonságos migrációs terv dokumentálva (2026-10-15); részletek: docs/outputs/DB-001.md. PG17.6 / 5433 / C:\Program Files\PostgreSQL\17\data; MOMAP-adatok a postgres adatbázisban, PostGIS 3.5.3. A mentések és backend futásidejű integráció nem igazoltak.
 - [ ] DB-001-MIGRATION – KÜLÖN JÓVÁHAGYÁSRA VÁR: cél D:\PostgreSQL\17\data; mentés és restore-próba, PEM-függőségek, karbantartási ablak, jogosultságok, adatellenőrzés és rollback szükséges. Migráció nem történt.
 
-Az architektúra- és térképes audit elkészült a mostani hatókörben. A 2026-10-15-i Autonomous Map Development Session prompt külön engedélyezte a terv szerinti nem destruktív frontend-fejlesztést, buildet és teszteket; ez nem engedély backendváltozásra, DB-migrációra vagy deployra. A korábbi technológiai, licenc- és költségállítások történeti kontextust adnak; teljes platformauditot és éles jóváhagyást nem helyettesítenek.
+Az architektúra- és térképes audit elkészült a mostani hatókörben. A 2026-10-15-i Autonomous Map Development Session prompt külön engedélyezte a terv szerinti nem destruktív frontend-fejlesztést, buildet és teszteket; az akkori engedély nem terjedt ki backendváltozásra, DB-migrációra vagy deployra; azóta a külön MAP-BACKEND-001 kérés engedélyezte a jelen API-kódjavítást. A korábbi technológiai, licenc- és költségállítások történeti kontextust adnak; teljes platformauditot és éles jóváhagyást nem helyettesítenek.
 
 - [x] SETUP-001 – Dokumentációs munkafolyamat; korábbi diff-blokkolás DB-001 alatt megszűnt. Történeti jelentés: docs/outputs/SETUP-001.md.
 - [x] P0-00 – Architektúra/map hatókörben az ellentmondások és bizonyítékhiányok feltárva: docs/research/P0-architecture-map-audit.md és P0-map-provider-audit.md. Teljes OSS/CMS licenc- és költségaudit továbbra is nyitott.
@@ -25,10 +25,10 @@ Az architektúra- és térképes audit elkészült a mostani hatókörben. A 202
 - [ ] MAP-SESSION-G – PARTIAL: build és 19 hálózat nélküli teszt PASS; böngészős hozzáférés elutasítva, UI/GPU/touch ellenőrzés BLOCKED.
 - [x] BACKEND-BUILD-001 – A két TS2353 hiba javítva; backend build és importlánc-regresszió PASS. Történeti jelentés: docs/outputs/BACKEND-BUILD-001.md.
 - [x] BACKEND-CONFIG-001 – Relatív .env miatt kimaradó DATABASE_URL és SCRAM jelszóhiba javítva. Build és 5 teszt PASS; read-only kapcsolat postgres:5433 PASS. Történeti jelentés: docs/outputs/BACKEND-CONFIG-001.md.
-- [ ] MAP-BACKEND-001 – NYITOTT: event DTO számkonverzió, SRID=4326 viewport, többértékű kategória és dátumszemantika; az eventType fordítási hibák külön BACKEND-BUILD-001 feladatban megoldva. További végrehajtás külön jóváhagyást igényel.
+- [x] MAP-BACKEND-001 – Számkonverzió, bbox-validáció, SRID=4326, több kategória, Budapest naptári/dátumátfedési szemantika, null végidő és Angular query/cache javítva. 49 offline + 1 élő read-only HTTP/PostGIS teszt és mindkét build PASS; valós backend/proxy 200. Részletek: docs/outputs/MAP-BACKEND-001.md.
 - [ ] MAP-DATA-001 – KÜLÖN ADAT/MIGRÁCIÓS TERV: 20 kanonikus régió, Budapest seed hivatkozásainak megőrzése/egyeztetése, provenance és entity/migration eltérés. Frontenden a HU-BP csak HU-BU jelenlétében rejtett, DB nem változott.
 
-A következő javasolt munkamenet a backendhibák külön jóváhagyott javítása és a böngészős/élő integrációs elfogadás. Provider-vásárlás, DB-migráció, deploy, commit és push továbbra is külön jóváhagyást igényel.
+A következő javasolt munkamenet MAP-INTEGRATION-001: engedélyezett böngészős/mobil elfogadás a november 15-i és december 2-i valós eseményekkel; a backend és Angular proxy HTTP-integrációja igazolt. Külön feladat a timestamp/provenance és development indításbiztonsági audit. Provider-vásárlás, DB-migráció, ingestionmódosítás, deploy, commit és push továbbra is külön jóváhagyást igényel.
 
 Jóváhagyott térképes termékkövetelmények: zárolt Magyarország-áttekintés vármegyeválasztásig; animált közelítés után szabad barangolás; a szűrők feletti ismertető önálló bezárása; kb. 400 ms-os viewport-alapú POI/event lekérés; közös térképi és listás eredményhalmaz. Mentett helyek és útitervek későbbi bővítés; most nincs teljes útvonaltervező.
 
