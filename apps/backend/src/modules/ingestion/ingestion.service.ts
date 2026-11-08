@@ -10,6 +10,7 @@ import { Event } from "../event/event.entity";
 import { POI } from "../poi/poi.entity";
 import { County } from "../county/county.entity";
 import { SettlementService } from "../settlement/settlement.service";
+import { SpatialCountyResolver } from "./spatial-county-resolver.service";
 import {
   DataAdapter,
   RawEventData,
@@ -28,6 +29,7 @@ export class IngestionService {
     @InjectRepository(POI) private poiRepo: Repository<POI>,
     @InjectRepository(County) private countyRepo: Repository<County>,
     private settlementService: SettlementService,
+    private spatialCountyResolver: SpatialCountyResolver,
   ) {}
 
   /**
@@ -148,9 +150,11 @@ export class IngestionService {
     }
     if (record.latitude !== undefined && (!Number.isFinite(record.latitude) || record.latitude < -90 || record.latitude > 90)) throw new Error('Invalid latitude');
     if (record.longitude !== undefined && (!Number.isFinite(record.longitude) || record.longitude < -180 || record.longitude > 180)) throw new Error('Invalid longitude');
-    const countyId = await this.resolveCountyId(record.settlement);
+    const countyId = record.latitude !== undefined && record.longitude !== undefined
+      ? await this.spatialCountyResolver.resolve(record.longitude,record.latitude)
+      : await this.resolveCountyId(record.settlement);
     if (!countyId) {
-      throw new Error(`No county found for settlement: ${record.settlement}`);
+      throw new Error(`No unambiguous county match for record: ${record.externalId}`);
     }
 
     // Check for duplicate by source + sourceId
@@ -217,7 +221,7 @@ export class IngestionService {
         !Number.isFinite(record.longitude) || record.longitude < -180 || record.longitude > 180) {
       throw new Error('Invalid POI coordinates');
     }
-    const countyId = await this.resolveCountyId(record.settlement);
+    const countyId = await this.spatialCountyResolver.resolve(record.longitude,record.latitude);
     if (!countyId) {
       throw new Error(`No county found for settlement: ${record.settlement}`);
     }

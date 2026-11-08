@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { ScheduleModule } from "@nestjs/schedule";
 import { IngestionService } from "./ingestion.service";
+import { SpatialCountyResolver } from "./spatial-county-resolver.service";
 import { AdminAuthModule } from "../auth/admin-auth.module";
 import { IngestionController } from "./ingestion.controller";
 import { IngestionJob } from "./entities/ingestion-job.entity";
@@ -22,6 +23,7 @@ import { SettlementModule } from "../settlement/settlement.module";
   ],
   providers: [
     IngestionService,
+    SpatialCountyResolver,
     IngestionScheduler,
     OSMAdapter,
     WikidataAdapter,
