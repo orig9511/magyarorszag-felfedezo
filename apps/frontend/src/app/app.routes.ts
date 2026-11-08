@@ -32,5 +32,8 @@ export const routes: Routes = [
     title: 'Vendégtérkép szerkesztése — Momap',
     loadComponent: () => import('./features/access/guide-editor.component').then(m => m.GuideEditorComponent),
   },
+  { path:'adatvedelem',title:'Adatkezelés – Momap',data:{kind:'privacy'},loadComponent:()=>import('./features/legal/legal-page.component').then(m=>m.LegalPageComponent) },
+  { path:'sutik',title:'Sütikezelés – Momap',data:{kind:'cookies'},loadComponent:()=>import('./features/legal/legal-page.component').then(m=>m.LegalPageComponent) },
+  { path:'impresszum',title:'Impresszum – Momap',data:{kind:'imprint'},loadComponent:()=>import('./features/legal/legal-page.component').then(m=>m.LegalPageComponent) },
   { path: '**', redirectTo: '' },
 ];
