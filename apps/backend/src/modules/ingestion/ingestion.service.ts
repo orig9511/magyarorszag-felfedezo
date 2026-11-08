@@ -179,29 +179,18 @@ export class IngestionService {
       attribution: record.attribution,
       retrievedAt: new Date(),
       status: "active",
+      location: record.latitude !== undefined && record.longitude !== undefined
+        ? {type:'Point' as const, coordinates:[record.longitude,record.latitude]}
+        : null,
     };
 
     if (existing) {
-      // Update existing record (location updated via raw SQL if coordinates available)
       await this.eventRepo.update(existing.id, eventData);
-      if (record.latitude !== undefined && record.longitude !== undefined) {
-        await this.eventRepo.query(
-          `UPDATE events SET location = ST_SetSRID(ST_MakePoint($1, $2), 4326) WHERE id = $3`,
-          [record.longitude, record.latitude, existing.id],
-        );
-      }
       return { created: false, updated: true };
     } else {
       // Create new record
       const event = this.eventRepo.create(eventData);
-      const saved = await this.eventRepo.save(event);
-      // Update location via raw SQL
-      if (record.latitude !== undefined && record.longitude !== undefined) {
-        await this.eventRepo.query(
-          `UPDATE events SET location = ST_SetSRID(ST_MakePoint($1, $2), 4326) WHERE id = $3`,
-          [record.longitude, record.latitude, saved.id],
-        );
-      }
+      await this.eventRepo.save(event);
       return { created: true, updated: false };
     }
   }
