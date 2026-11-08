@@ -192,9 +192,9 @@ export class IngestionService {
       const event = this.eventRepo.create(eventData);
       const saved = await this.eventRepo.save(event);
       // Update location via raw SQL
-      if (record.latitude && record.longitude) {
+      if (record.latitude !== undefined && record.longitude !== undefined) {
         await this.eventRepo.query(
-          `UPDATE events SET location = ST_GeomFromText('POINT(? ?)', 4326) WHERE id = ?`,
+          `UPDATE events SET location = ST_SetSRID(ST_MakePoint($1, $2), 4326) WHERE id = $3`,
           [record.longitude, record.latitude, saved.id],
         );
       }
@@ -209,6 +209,14 @@ export class IngestionService {
     sourceAdapter: string,
     record: RawPOIData,
   ): Promise<{ created: boolean; updated: boolean }> {
+    if (!record.sourceUrl || !record.licenseType || !record.attribution ||
+        !['cc0','cc-by','cc-by-4.0','odbl','odbl-1.0','ogl'].includes(record.licenseType.toLowerCase())) {
+      throw new Error('Missing or unrecognized POI source metadata');
+    }
+    if (!Number.isFinite(record.latitude) || record.latitude < -90 || record.latitude > 90 ||
+        !Number.isFinite(record.longitude) || record.longitude < -180 || record.longitude > 180) {
+      throw new Error('Invalid POI coordinates');
+    }
     const countyId = await this.resolveCountyId(record.settlement);
     if (!countyId) {
       throw new Error(`No county found for settlement: ${record.settlement}`);
@@ -248,7 +256,7 @@ export class IngestionService {
       const saved = await this.poiRepo.save(poi);
       // Update location via raw SQL
       await this.poiRepo.query(
-        `UPDATE pois SET location = ST_GeomFromText('POINT(? ?)', 4326) WHERE id = ?`,
+        `UPDATE pois SET location = ST_SetSRID(ST_MakePoint($1, $2), 4326) WHERE id = $3`,
         [record.longitude, record.latitude, saved.id],
       );
       return { created: true, updated: false };
