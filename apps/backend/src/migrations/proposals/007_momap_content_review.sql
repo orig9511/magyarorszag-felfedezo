@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS momap_content_review_log (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   entity_kind varchar(8) NOT NULL CHECK (entity_kind IN ('event','poi')),
   entity_id uuid NOT NULL,
-  action varchar(24) NOT NULL CHECK (action IN ('approve','quarantine','restore')),
+  action varchar(24) NOT NULL CHECK (action IN ('approve','reject','quarantine','restore')),
   actor_id uuid NOT NULL,
   reason text,
   created_at timestamptz NOT NULL DEFAULT NOW()
