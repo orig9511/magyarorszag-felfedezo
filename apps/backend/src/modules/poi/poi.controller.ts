@@ -1,4 +1,4 @@
-import { Controller, Get, Query, Param } from '@nestjs/common';
+import { Controller, Get, Query, Param, Header } from '@nestjs/common';
 import { POIService } from './poi.service';
 import { GetPOIsDto } from './dto/get-pois.dto';
 
@@ -6,6 +6,7 @@ import { GetPOIsDto } from './dto/get-pois.dto';
 export class POIController {
   constructor(private poiService: POIService) {}
 
+  @Header("Cache-Control", "public, max-age=60, stale-while-revalidate=300")
   @Get('viewport')
   async getPOIsByViewport(@Query() dto: GetPOIsDto) {
     return this.poiService.getPOIsByViewport(dto);

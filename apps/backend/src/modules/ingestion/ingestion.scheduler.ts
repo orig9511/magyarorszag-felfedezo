@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { IngestionService } from './ingestion.service';
+import { DataRetentionService } from './data-retention.service';
 import { OSMAdapter } from './adapters/osm.adapter';
 import { WikidataAdapter } from './adapters/wikidata.adapter';
 
@@ -16,13 +17,14 @@ export class IngestionScheduler {
     private ingestionService: IngestionService,
     private osmAdapter: OSMAdapter,
     private wikidataAdapter: WikidataAdapter,
+    private retention: DataRetentionService,
   ) {}
 
   /**
    * Run OSM ingestion daily at 2 AM UTC.
    * Keeps POI data fresh from OpenStreetMap.
    */
-  @Cron('0 2 * * *')
+  @Cron('0 2 * * *', { timeZone: 'UTC' })
   async runDailyOSMIngestion() {
     if (process.env.MOMAP_INGESTION_ENABLED !== 'true') { this.logger.log('OSM ingestion disabled by default'); return; }
     this.logger.log('Starting scheduled OSM ingestion');
@@ -38,7 +40,7 @@ export class IngestionScheduler {
    * Run Wikidata ingestion weekly on Sunday at 3 AM UTC.
    * Wikidata data changes less frequently; keep query count low per docs.
    */
-  @Cron('0 3 * * 0')
+  @Cron('0 3 * * 0', { timeZone: 'UTC' })
   async runWeeklyWikidataIngestion() {
     if (process.env.MOMAP_INGESTION_ENABLED !== 'true') { this.logger.log('Wikidata ingestion disabled by default'); return; }
     this.logger.log('Starting scheduled Wikidata ingestion');
@@ -48,5 +50,12 @@ export class IngestionScheduler {
     } catch (error) {
       this.logger.error(`Wikidata ingestion failed: ${error}`);
     }
+  }
+  /** Separate opt-in cleanup: never triggered by a map request. */
+  @Cron('0 4 * * *', { timeZone: 'UTC' })
+  async runDailyRetention(){
+    if(process.env.MOMAP_RETENTION_DELETE_ENABLED!=='true')return;
+    try { const result=await this.retention.prune(); this.logger.log('Retention: '+JSON.stringify(result)); }
+    catch(error){ this.logger.error('Retention failed: '+error); }
   }
 }
