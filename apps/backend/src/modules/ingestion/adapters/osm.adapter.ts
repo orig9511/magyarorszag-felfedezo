@@ -45,8 +45,8 @@ export class OSMAdapter implements DataAdapter {
         );
       }
 
-      const text = await response.text();
-      const pois = this.parseOverpassXML(text);
+      const payload: unknown = await response.json();
+      const pois = this.parseOverpassJSON(payload);
       this.logger.log(`Fetched ${pois.length} POIs from Overpass`);
       return pois;
     } catch (error) {
@@ -80,7 +80,7 @@ export class OSMAdapter implements DataAdapter {
     const bbox = "47.5,21.6,47.55,21.7"; // rough Debrecen area
 
     return `
-[out:xml];
+[out:json][timeout:55];
 (
   node["amenity"~"restaurant|cafe|bar|pub|fast_food"](${bbox});
   node["tourism"~"attraction|hotel|hostel|guest_house|museum"](${bbox});
@@ -93,60 +93,39 @@ out center;
 `;
   }
 
-  private parseOverpassXML(xmlText: string): RawPOIData[] {
-    const pois: RawPOIData[] = [];
-
-    try {
-      // Simple regex-based parsing (XML library not available in basic NestJS)
-      // In production, use a proper XML parser like xml2js
-      const nodeMatches = xmlText.matchAll(
-        /<node id="(\d+)"[^>]*lat="([^"]+)"[^>]*lon="([^"]+)"[^>]*>(.*?)<\/node>/gs,
-      );
-
-      for (const match of nodeMatches) {
-        const osm_id = match[1];
-        const lat = parseFloat(match[2]);
-        const lon = parseFloat(match[3]);
-        const tagsXml = match[4];
-
-        const nameMatch = tagsXml.match(/<tag k="name" v="([^"]+)"/);
-        const name = nameMatch ? nameMatch[1] : `POI ${osm_id}`;
-
-        const categoryMatch = tagsXml.match(
-          /<tag k="(?:amenity|tourism|historic)" v="([^"]+)"/,
-        );
-        const category = categoryMatch ? categoryMatch[1] : "attraction";
-
-        const descriptionMatch = tagsXml.match(
-          /<tag k="description" v="([^"]+)"/,
-        );
-        const description = descriptionMatch ? descriptionMatch[1] : undefined;
-
-        const websiteMatch = tagsXml.match(/<tag k="website" v="([^"]+)"/);
-        const website = websiteMatch ? websiteMatch[1] : undefined;
-
-        const phoneMatch = tagsXml.match(/<tag k="phone" v="([^"]+)"/);
-        const phone = phoneMatch ? phoneMatch[1] : undefined;
-
-        pois.push({
-          externalId: `node/${osm_id}`,
-          name,
-          category,
-          latitude: lat,
-          longitude: lon,
-          settlement: "Debrecen", // TODO: geocode from coordinates
-          description,
-          website,
-          phone,
-          sourceUrl: `https://www.openstreetmap.org/node/${osm_id}`,
-          licenseType: "ODbL",
-          attribution: "OpenStreetMap contributors",
-        });
-      }
-    } catch (error) {
-      this.logger.error(`Failed to parse Overpass XML: ${error}`);
+  private parseOverpassJSON(payload: unknown): RawPOIData[] {
+    if (!payload || typeof payload !== 'object' || !('elements' in payload) ||
+        !Array.isArray((payload as {elements:unknown}).elements)) {
+      throw new Error('Invalid Overpass JSON response');
     }
-
-    return pois;
+    const elements=(payload as {elements:unknown[]}).elements;
+    const results:RawPOIData[]=[];
+    const seen=new Set<string>();
+    for(const item of elements) {
+      if(!item || typeof item!=='object')continue;
+      const el=item as {type?:string;id?:number;lat?:number;lon?:number;
+        center?:{lat?:number;lon?:number};tags?:Record<string,string>};
+      if(!['node','way','relation'].includes(el.type||'') || !Number.isSafeInteger(el.id))continue;
+      const id=el.type+'/'+el.id;
+      if(seen.has(id))continue;
+      const tags=el.tags||{};
+      const name=tags['name:hu']||tags.name;
+      const category=tags.tourism||tags.amenity||tags.historic;
+      const lat=el.type==='node'?el.lat:el.center?.lat;
+      const lon=el.type==='node'?el.lon:el.center?.lon;
+      if(!name || !category || typeof lat!=='number'||typeof lon!=='number'||
+         !Number.isFinite(lat)||!Number.isFinite(lon)||lat < -90||lat > 90||lon < -180||lon > 180)continue;
+      seen.add(id);
+      results.push({
+        externalId:id,name,category,latitude:lat,longitude:lon,
+        // Geographic matching must be reviewed before import is approved.
+        settlement:'Debrecen',
+        description:tags.description,website:tags.website,phone:tags.phone,
+        address:[tags['addr:street'],tags['addr:housenumber']].filter(Boolean).join(' ')||undefined,
+        sourceUrl:'https://www.openstreetmap.org/'+id,
+        licenseType:'ODbL',attribution:'© OpenStreetMap contributors',
+      });
+    }
+    return results;
   }
 }
