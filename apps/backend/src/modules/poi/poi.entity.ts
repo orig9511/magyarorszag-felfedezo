@@ -55,6 +55,9 @@ export class POI {
   @Column({ nullable: true })
   imageUrl!: string;
 
+  @Column({ default: 'active' })
+  moderationStatus!: 'active' | 'quarantined';
+
   @Column()
   source!: string; // 'osm', 'wikidata', 'lechner', 'imported', etc.
 
