@@ -140,9 +140,12 @@ export class IngestionService {
     sourceAdapter: string,
     record: RawEventData,
   ): Promise<{ created: boolean; updated: boolean }> {
-    if (!record.sourceUrl || !record.licenseType || !record.attribution) {
+    if (!record.sourceUrl || !record.licenseType || !record.attribution ||
+        !['cc0','cc-by','cc-by-4.0','odbl','odbl-1.0','ogl'].includes(record.licenseType.toLowerCase())) {
       throw new Error('Missing source URL, license or attribution');
     }
+    if (record.latitude !== undefined && (!Number.isFinite(record.latitude) || record.latitude < -90 || record.latitude > 90)) throw new Error('Invalid latitude');
+    if (record.longitude !== undefined && (!Number.isFinite(record.longitude) || record.longitude < -180 || record.longitude > 180)) throw new Error('Invalid longitude');
     const countyId = await this.resolveCountyId(record.settlement);
     if (!countyId) {
       throw new Error(`No county found for settlement: ${record.settlement}`);
