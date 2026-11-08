@@ -36,6 +36,11 @@ interface GuestGuide {
           <img *ngIf="guide.branding.logoUrl" [src]="guide.branding.logoUrl" alt="" width="44" height="44" referrerpolicy="no-referrer" />
           <div><p>Fedezd fel a környéket</p><h1>{{ guide.branding.title }}</h1></div>
         </div>
+        <div class="guest-sharing">
+          <button type="button" (click)="shareGuide()">Megosztás</button>
+          <button type="button" (click)="copyGuideLink()">Link másolása</button>
+          <span *ngIf="shareMessage" role="status">{{shareMessage}}</span>
+        </div>
         <div class="guest-controls"><button (click)="selectedCategory='all';renderPlaces()" [class.active]="selectedCategory==='all'">Összes</button><button *ngFor="let cat of categories" (click)="selectedCategory=cat;renderPlaces()" [class.active]="selectedCategory===cat">{{cat}}</button></div>
         <p class="guest-note" *ngIf="places.length===0">Ehhez a térképhez még nincs megjeleníthető helyszín.</p>
         <div class="guest-layout">
@@ -64,6 +69,9 @@ interface GuestGuide {
     .guest-list{max-height:70vh;overflow:auto;display:flex;flex-direction:column;gap:8px}
     .guest-place{display:flex;flex-direction:column;align-items:flex-start;text-align:left;gap:6px;background:#1d2b21;border:1px solid #3b5140;border-radius:12px;padding:14px;color:#fff;cursor:pointer}
     .guest-place small,.guest-place span{color:#b5cab9}
+    .guest-sharing{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:1rem}
+    .guest-sharing button{border:1px solid #52795d;background:#254332;color:#e8f5e7;border-radius:9px;padding:10px 14px;cursor:pointer}
+    .guest-sharing span{font-size:.85rem;color:#c4e7c7}
     .guest-controls{display:flex;gap:8px;overflow:auto;padding:12px 0}
     .guest-controls button{white-space:nowrap;border:1px solid #48634e;background:#203126;color:#e3f5e5;padding:9px 14px;border-radius:30px;cursor:pointer}
     .guest-controls button.active{background:#c0e9b6;color:#152219}
@@ -80,6 +88,20 @@ export class GuestGuideComponent implements AfterViewInit, OnDestroy {
   guide?: GuestGuide;
   places: GuestPlace[] = [];
   selectedCategory = 'all';
+  shareMessage = '';
+  private guideUrl():string { return new URL('/g/'+encodeURIComponent(this.guide!.slug),window.location.origin).href; }
+  async copyGuideLink():Promise<void>{
+    if(!this.guide)return;
+    try{await navigator.clipboard.writeText(this.guideUrl());this.shareMessage='A vendégtérkép hivatkozása másolva.';}
+    catch{this.shareMessage='A hivatkozás másolása nem sikerült.';}
+  }
+  async shareGuide():Promise<void>{
+    if(!this.guide)return;
+    const url=this.guideUrl();
+    if(typeof navigator.share!=='function'){await this.copyGuideLink();return;}
+    try{await navigator.share({title:this.guide.branding.title,text:'Fedezd fel a környék ajánlott helyeit!',url});this.shareMessage='';}
+    catch(e){if((e as Error)?.name!=='AbortError')this.shareMessage='A megosztás nem sikerült.';}
+  }
   private markers: maplibregl.Marker[] = [];
   get categories(): string[] { return [...new Set(this.places.map(p => p.kind==='event'?'event':p.category))]; }
   get filteredPlaces(): GuestPlace[] { return this.places.filter(p=>this.selectedCategory==='all'||(p.kind==='event'?'event':p.category)===this.selectedCategory); }
