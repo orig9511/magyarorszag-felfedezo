@@ -12,7 +12,7 @@ function nodes(value:unknown,depth=0):Dict[]{
 }
 function isEvent(v:Dict):boolean{
  const type=v['@type'];
- return (Array.isArray(type)?type:[type]).some(t=>typeof t==='string'&&/^(?:https?:\\/\\/schema.org\\/)?Event$/.test(t));
+ return (Array.isArray(type)?type:[type]).some(t=>typeof t==='string'&&/^(?:https?:\/\/schema.org\/)?Event$/.test(t));
 }
 function extractVenue(value:unknown):{name?:string;settlement?:string}{
  if(!obj(value))return {};
@@ -25,7 +25,7 @@ export function extractTicketEvents(
 ):RawEventData[]{
  const base=new URL(pageUrl);
  if(base.protocol!=='https:')throw new Error('HTTPS required for ticket source');
- const scripts=html.matchAll(/<script\\b[^>]*type\\s*=\\s*["']application\\/ld\\+json["'][^>]*>([\\s\\S]*?)<\\/script>/gi);
+ const scripts=html.matchAll(/<script\b[^>]*type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
  const out:RawEventData[]=[];
  const seen=new Set<string>();
  for(const match of scripts){
@@ -37,7 +37,7 @@ export function extractTicketEvents(
    const venue=extractVenue(item.location);
    // Explicit zone/offset and clock time are mandatory to avoid local-date drift.
    if(!title||title.length<5||!date||
-      !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(?::\\d{2})?(?:Z|[+-]\\d{2}:\\d{2})$/i.test(date)||
+      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?(?:Z|[+-]\d{2}:\d{2})$/i.test(date)||
       !venue.name||!venue.settlement)continue;
    const startTime=new Date(date);
    if(!Number.isFinite(startTime.getTime()))continue;
