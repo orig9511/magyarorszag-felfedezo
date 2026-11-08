@@ -61,7 +61,7 @@ interface Pending {id:string;email:string;name:string;businessType:Vertical;crea
      <div class="item" *ngFor="let o of organizations"><div><strong>{{o.name}}</strong><p>{{o.slug}} · {{typeLabel(o.businessType)}} · {{o.role}}</p></div><span class="pill">Aktív hozzáférés</span></div>
      <div class="empty" *ngIf="!organizations.length">Ehhez a munkaterülethez nincs hozzárendelt vállalkozás.</div>
      <div class="section-head"><h2>Vendégtérképek</h2><a [routerLink]="['/access',vertical,'guides','new']">+ Új vendégtérkép</a></div>
-     <div class="item" *ngFor="let g of guides"><div><strong>{{g.title}}</strong><p>{{g.organization}} · {{g.slug}}</p></div><a *ngIf="g.published" [routerLink]="['/g',g.slug]">Térkép megnyitása</a><a *ngIf="!g.published" [routerLink]="['/access',vertical,'guides',g.id]">Szerkesztés</a></div>
+     <div class="item" *ngFor="let g of guides"><div><strong>{{g.title}}</strong><p>{{g.organization}} · {{g.slug}}</p></div><div class="guide-actions" *ngIf="g.published"><a [routerLink]="['/g',g.slug]">Térkép megnyitása</a><button type="button" class="ghost" (click)="copyGuideLink(g)">Link másolása</button><button type="button" class="ghost" (click)="shareGuide(g)">Megosztás</button></div><a *ngIf="!g.published" [routerLink]="['/access',vertical,'guides',g.id]">Szerkesztés</a></div>
      <div class="empty" *ngIf="!guides.length">Még nincs vendégtérkép. Hozz létre egy új piszkozatot.</div>
     </ng-container>
    </ng-container>
@@ -87,6 +87,8 @@ interface Pending {id:string;email:string;name:string;businessType:Vertical;crea
  .primary{width:100%;margin-top:15px}.alert,.success{padding:14px;border-radius:10px;margin:12px 0;background:#4a2525;color:#ffdddd}.success{background:#24452c;color:#d3f5d4}
  .identity{margin:0 0 30px;display:flex;gap:10px;align-items:center;color:#bcd1c0}.dot{width:8px;height:8px;border-radius:50%;background:#bdf1b4}.pill{font-size:12px;border:1px solid #45634b;padding:7px 10px;border-radius:30px;color:#bbd6bd}
  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:15px;margin-bottom:35px}.stats article{background:#19291f;padding:22px;border:1px solid #314a37;border-radius:13px}.stats span{display:block;color:#a6bbaa;font-size:13px}.stats strong{font-size:36px}
+ .guide-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+ .guide-actions button{padding:9px 12px;font-size:12px}
  .section-head{display:flex;align-items:center;justify-content:space-between;margin-top:24px}.item{background:#19291f;border:1px solid #314a37;padding:18px 22px;border-radius:12px;margin:10px 0;display:flex;justify-content:space-between;align-items:center;gap:15px}.item p{color:#a4b7a6;margin:7px 0 0;font-size:13px}.actions{display:flex;gap:8px}.danger{background:#472b2b;color:#f5dada}.empty{border:1px dashed #47604c;padding:26px;border-radius:12px;color:#a4b7a6}
  @media(max-width:760px){.shell{display:block}.sidebar{padding:14px;gap:4px;flex-direction:row;flex-wrap:wrap}.sidebar .logo{width:100%;margin:0}.sidebar>a:not(.logo){font-size:12px;padding:7px}.side-label,.side-footer{display:none}main{padding:24px 16px}.stats{gap:8px}.stats article{padding:12px}.stats strong{font-size:25px}.item{flex-wrap:wrap}header{flex-wrap:wrap}}
  `]
@@ -134,6 +136,20 @@ export class AccessComponent implements OnInit {
  async decide(id:string,approve:boolean){
   try{await this.request('admin/'+id+'/'+(approve?'approve':'reject'),'POST');this.notice=approve?'Partner jóváhagyva.':'Kérelem elutasítva.';await this.refresh();}
   catch(e){this.error=e instanceof Error?e.message:'Hiba történt.';}
+ }
+ private guestUrl(guide:Guide):string {
+  return new URL('/g/'+encodeURIComponent(guide.slug),window.location.origin).href;
+ }
+ async copyGuideLink(guide:Guide){
+  if(!guide.published)return;
+  try{await navigator.clipboard.writeText(this.guestUrl(guide));this.notice='A vendégtérkép hivatkozása másolva.';}
+  catch{this.error='A hivatkozás másolása nem sikerült.';}
+ }
+ async shareGuide(guide:Guide){
+  if(!guide.published)return;
+  if(typeof navigator.share!=='function'){await this.copyGuideLink(guide);return;}
+  try{await navigator.share({title:guide.title,text:'Vendégtérkép – Momap',url:this.guestUrl(guide)});}
+  catch(e){if((e as Error)?.name!=='AbortError')this.error='A megosztás nem sikerült.';}
  }
  async publishGuide(guide:ModeratedGuide,publish:boolean){
   if(!confirm(publish?'Ellenőrizted a helyszínek forrását és a felhasználási jogokat? Publikálod a térképet?':'Visszavonod a nyilvános térképet?'))return;
