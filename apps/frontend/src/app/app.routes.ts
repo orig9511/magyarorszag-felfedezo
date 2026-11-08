@@ -18,11 +18,6 @@ export const routes: Routes = [
     loadComponent: () => import('./features/guest-guide/guest-guide.component').then(m => m.GuestGuideComponent),
   },
   {
-    path: 'access/:vertical',
-    title: 'Momap Access — Partner és admin felület',
-    loadComponent: () => import('./features/access/access.component').then(m => m.AccessComponent),
-  },
-  {
     path: 'access/:vertical/guides/new',
     title: 'Új vendégtérkép — Momap',
     loadComponent: () => import('./features/access/guide-editor.component').then(m => m.GuideEditorComponent),
@@ -31,6 +26,11 @@ export const routes: Routes = [
     path: 'access/:vertical/guides/:id',
     title: 'Vendégtérkép szerkesztése — Momap',
     loadComponent: () => import('./features/access/guide-editor.component').then(m => m.GuideEditorComponent),
+  },
+  {
+    path: 'access/:vertical',
+    title: 'Momap Access — Partner és admin felület',
+    loadComponent: () => import('./features/access/access.component').then(m => m.AccessComponent),
   },
   { path:'adatvedelem',title:'Adatkezelés – Momap',data:{kind:'privacy'},loadComponent:()=>import('./features/legal/legal-page.component').then(m=>m.LegalPageComponent) },
   { path:'sutik',title:'Sütikezelés – Momap',data:{kind:'cookies'},loadComponent:()=>import('./features/legal/legal-page.component').then(m=>m.LegalPageComponent) },
