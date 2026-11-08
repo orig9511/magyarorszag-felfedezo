@@ -11,7 +11,7 @@ interface MapResponse{
 }
 interface ScrapeResponse{
  success?:boolean;
- data?:{html?:unknown};
+ data?:{html?:unknown;metadata?:{url?:string;sourceURL?:string}};
 }
 /**
  * Source-approved, bounded Firecrawl event collection with structured-data extraction.
@@ -72,7 +72,10 @@ export class FirecrawlTicketAdapter implements DataAdapter {
    });
    if(!response.success||typeof response.data?.html!=='string')
     throw new Error('Firecrawl page did not return HTML');
-   const rows=extractTicketEvents(response.data.html,url,source.name,source.licence!,source.name);
+   const finalUrl=response.data.metadata?.sourceURL||response.data.metadata?.url||url;
+   if(!isTicketSourceUrl(finalUrl,source))
+    throw new Error('Firecrawl redirected outside the approved ticket domain');
+   const rows=extractTicketEvents(response.data.html,finalUrl,source.name,source.licence!,source.name);
    events.push(...rows);
    if(index+1<urls.length)await new Promise<void>(resolve=>setTimeout(resolve,750));
   }
