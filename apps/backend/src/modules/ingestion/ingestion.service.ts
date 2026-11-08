@@ -185,7 +185,10 @@ export class IngestionService {
     };
 
     if (existing) {
-      await this.eventRepo.update(existing.id, eventData);
+      await this.eventRepo.update(existing.id, {
+        ...eventData,
+        location: eventData.location ?? existing.location,
+      });
       return { created: false, updated: true };
     } else {
       // Create new record
