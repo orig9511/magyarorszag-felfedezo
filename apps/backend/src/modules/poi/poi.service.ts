@@ -14,7 +14,8 @@ export class POIService {
   async getPOIsByViewport(dto: GetPOIsDto): Promise<POI[]> {
     const query = this.poiRepository
       .createQueryBuilder('poi')
-      .where(
+      .where('poi.moderationStatus = :visibility', { visibility: 'active' })
+      .andWhere(
         `ST_Intersects(
           poi.location,
           ST_MakeEnvelope(:minLng, :minLat, :maxLng, :maxLat, 4326)
@@ -46,6 +47,6 @@ export class POIService {
   }
 
   async getPOIById(id: string): Promise<POI | null> {
-    return this.poiRepository.findOne({ where: { id } });
+    return this.poiRepository.findOne({ where: { id, moderationStatus: 'active' } });
   }
 }
