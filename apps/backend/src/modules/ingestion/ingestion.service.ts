@@ -175,7 +175,7 @@ export class IngestionService {
       const candidates = await this.eventRepo.createQueryBuilder('event')
         .where('event.countyId = :countyId', {countyId})
         .andWhere('event.startTime BETWEEN :start AND :end', {start,end})
-        .andWhere('event.status != :cancelled', {cancelled:'cancelled'})
+        .andWhere('event.status IN (:...statuses)', {statuses:['active','draft']})
         .take(500).getMany();
       const duplicate = candidates.find(candidate => {
         try {
@@ -217,6 +217,8 @@ export class IngestionService {
     if (existing) {
       await this.eventRepo.update(existing.id, {
         ...eventData,
+        // Re-scrapes may refresh content, but must never reverse a moderation decision.
+        status: existing.status,
         location: eventData.location ?? existing.location,
       });
       return { created: false, updated: true };
