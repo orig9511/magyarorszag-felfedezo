@@ -240,6 +240,7 @@ export class IngestionService {
       attribution: record.attribution,
       importedAt: new Date(),
       externalRefs: { sourceUrl: record.sourceUrl!, license: record.licenseType! },
+      location: { type: 'Point' as const, coordinates: [record.longitude, record.latitude] },
     };
 
     if (existing) {
@@ -254,11 +255,6 @@ export class IngestionService {
       // Create new record
       const poi = this.poiRepo.create(poiData);
       const saved = await this.poiRepo.save(poi);
-      // Update location via raw SQL
-      await this.poiRepo.query(
-        `UPDATE pois SET location = ST_SetSRID(ST_MakePoint($1, $2), 4326) WHERE id = $3`,
-        [record.longitude, record.latitude, saved.id],
-      );
       return { created: true, updated: false };
     }
   }
