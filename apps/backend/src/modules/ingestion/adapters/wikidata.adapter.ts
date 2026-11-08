@@ -1,5 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { DataAdapter, RawPOIData } from "../interfaces/data-adapter.interface";
+import { selectedIngestionRegion, withinRegion } from "../region-config";
+import { normalizeWikidataCategory } from "../poi-taxonomy";
 
 /**
  * Wikidata POI adapter using SPARQL endpoint.
@@ -18,6 +20,8 @@ export class WikidataAdapter implements DataAdapter {
   async fetchData(): Promise<RawPOIData[]> {
     // Query for cultural and historic POIs in Hajdú-Bihar county
     // TODO: Make region/settlement configurable
+    // Geographic P131 query is unverified. Do not request or ingest misleading results.
+    throw new Error("Wikidata ingestion blocked until the geographic SPARQL query is reviewed");
     const query = this.buildSPARQLQuery();
 
     const controller = new AbortController();
@@ -100,6 +104,7 @@ LIMIT 100
 
   private parseSPARQLResults(json: any): RawPOIData[] {
     const pois: RawPOIData[] = [];
+    const region=selectedIngestionRegion();
 
     try {
       if (!json?.results || !Array.isArray(json.results.bindings)) {
@@ -121,17 +126,17 @@ LIMIT 100
 
         const lon = parseFloat(coordMatch[1]);
         const lat = parseFloat(coordMatch[2]);
-        if (!Number.isFinite(lat) || !Number.isFinite(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) continue;
+        if (!withinRegion(lat,lon,region)) continue;
 
         const qId = itemUri.split("/").pop() || "";
 
         pois.push({
           externalId: qId,
           name,
-          category: "cultural", // Wikidata items are cultural
+          category: normalizeWikidataCategory(),
           latitude: lat,
           longitude: lon,
-          settlement: "Debrecen", // TODO: geocode or use location hierarchies
+          settlement: region.settlement,
           description,
           website,
           sourceUrl: `https://www.wikidata.org/wiki/${qId}`,
