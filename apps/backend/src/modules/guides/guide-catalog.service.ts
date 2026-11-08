@@ -2,7 +2,6 @@ import { BadRequestException, Injectable } from "@nestjs/common";
 import { DataSource } from "typeorm";
 import { AccessIdentity } from "../access/access.service";
 
-const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const TYPES=["poi","event"] as const;
 @Injectable()
 export class GuideCatalogService {
@@ -32,8 +31,8 @@ export class GuideCatalogService {
    await this.db.query(
     `SELECT id,title,category,ST_X(location) AS lng,ST_Y(location) AS lat,
       attribution,venue AS address FROM events WHERE ${where} AND title ILIKE $4
-      AND status='active' AND "isTestData"=false AND "startTime">=now()
-      AND "licenseType" IN ('cc0','cc-by','ogl')
+      AND location IS NOT NULL AND status='active' AND "isTestData"=false AND "startTime">=now()
+      AND "licenseType" IN ('cc0','cc-by','ogl') AND attribution IS NOT NULL
       ORDER BY location::geography <-> ${point} LIMIT $5`,
     [lng,lat,radius,"%"+q.replace(/[\\%_]/g,"\\$&")+"%",limit]);
   return {items:rows.map((r:any)=>({id:r.id,kind,title:r.title,category:r.category,
