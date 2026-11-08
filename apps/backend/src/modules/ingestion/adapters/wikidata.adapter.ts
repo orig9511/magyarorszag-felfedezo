@@ -102,9 +102,8 @@ LIMIT 100
     const pois: RawPOIData[] = [];
 
     try {
-      if (!json.results || !json.results.bindings) {
-        this.logger.warn("Unexpected Wikidata response format");
-        return pois;
+      if (!json?.results || !Array.isArray(json.results.bindings)) {
+        throw new Error("Unexpected Wikidata response format");
       }
 
       for (const binding of json.results.bindings) {
@@ -122,7 +121,7 @@ LIMIT 100
 
         const lon = parseFloat(coordMatch[1]);
         const lat = parseFloat(coordMatch[2]);
-        if (isNaN(lat) || isNaN(lon)) continue;
+        if (!Number.isFinite(lat) || !Number.isFinite(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) continue;
 
         const qId = itemUri.split("/").pop() || "";
 
@@ -142,6 +141,7 @@ LIMIT 100
       }
     } catch (error) {
       this.logger.error(`Failed to parse Wikidata results: ${error}`);
+      throw error;
     }
 
     return pois;
