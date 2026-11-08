@@ -5,6 +5,7 @@ import { extractTicketEvents } from '../ticket-jsonld';
 
 interface MapResponse{
  success?:boolean;
+ status?:string;
  links?:Array<string|{url:string}>;
  data?:{links?:Array<string|{url:string}>};
 }
@@ -47,7 +48,7 @@ export class FirecrawlTicketAdapter implements DataAdapter {
    url:config.indexUrl,search:config.search,limit:Math.min(config.maxUrls*3,100),
    ignoreQueryParameters:true,sitemap:'include',
   });
-  if(!response.success)throw new Error('Firecrawl URL discovery failed');
+  if(response.success!==true&&response.status!=='success')throw new Error('Firecrawl URL discovery failed');
   const links=response.links||response.data?.links||[];
   const urls=links.map(item=>typeof item==='string'?item:item.url)
    .filter(url=>isTicketSourceUrl(url,source));
