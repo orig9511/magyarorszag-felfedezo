@@ -1,9 +1,12 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit } from '@angular/core';
+import { AfterViewChecked, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import maplibregl from 'maplibre-gl';
+import { MAP_STYLE } from '../../core/config/map-style';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AccessSessionService } from './access-session.service';
 
+interface CatalogPlace {id:string;kind:'poi'|'event';title:string;category:string;coordinates:[number,number];attribution?:string;address?:string;}
 interface GuideForm {
  organizationId:string;slug:string;
  branding:{title:string;accentColor:string;logoUrl?:string};
@@ -40,10 +43,24 @@ const TYPES=['hotel','restaurant','service'];
    <section><h2>Kategóriák</h2>
     <div class="chips"><label *ngFor="let c of availableCategories"><input type="checkbox" [checked]="form.categories.includes(c.id)" (change)="toggleCategory(c.id,$event)"/>{{c.label}}</label></div>
    </section>
-   <section><h2>Kiválasztott helyszínek és események</h2>
-    <p>Azonosítók soronként (UUID). A helyszínválasztó és térképi előnézet külön fejlesztés.</p>
-    <label>POI azonosítók<textarea name="pois" [(ngModel)]="poiText" rows="4" placeholder="Egy UUID soronként"></textarea></label>
-    <label>Eseményazonosítók<textarea name="events" [(ngModel)]="eventText" rows="4" placeholder="Egy UUID soronként"></textarea></label>
+   <section><h2>Helyszínek és események kiválasztása</h2>
+    <p>Keress a térkép középpontjának környékén. A találatokat hozzáadhatod a vendégtérképedhez.</p>
+    <div class="two"><label>Keresés<input name="catalogSearch" [(ngModel)]="catalogSearch" placeholder="Helyszín neve"/></label>
+    <label>Típus<select name="catalogKind" [(ngModel)]="catalogKind"><option value="poi">Helyszínek</option><option value="event">Események</option></select></label></div>
+    <div class="actions"><button type="button" (click)="searchCatalog()" [disabled]="searching">{{searching?'Keresés…':'Keresés a környéken'}}</button><span>30 km-es körzet</span></div>
+    <div class="catalog-layout">
+     <div class="catalog-list">
+      <div *ngFor="let place of catalogResults" class="catalog-row"><div><strong>{{place.title}}</strong><small>{{place.category}} · {{place.address || 'Helyszín'}}</small></div>
+       <button type="button" (click)="togglePlace(place)">{{isSelected(place)?'Eltávolítás':'+ Hozzáadás'}}</button></div>
+      <p *ngIf="!catalogResults.length">A találatok itt jelennek meg.</p>
+     </div>
+     <div class="map-preview"><div #catalogMap class="map-canvas" aria-label="Helyszínek térképe"></div></div>
+    </div>
+    <p>Kiválasztva: {{form.poiIds.length}} helyszín és {{form.eventIds.length}} esemény.</p>
+    <details><summary>Haladó: azonosítók szerkesztése</summary>
+      <label>POI UUID-k<textarea name="pois" [(ngModel)]="poiText" rows="3"></textarea></label>
+      <label>Esemény UUID-k<textarea name="events" [(ngModel)]="eventText" rows="3"></textarea></label>
+    </details>
    </section>
    <div class="actions"><button type="submit" [disabled]="busy||!f.valid||form.published">{{busy?'Mentés…':'Piszkozat mentése'}}</button><span *ngIf="form.published">Publikált térkép nem módosítható ezen a felületen.</span></div>
   </form>
@@ -55,13 +72,23 @@ const TYPES=['hotel','restaurant','service'];
  label{display:block;margin:14px 0;color:#d1e1d2;font-size:14px}
  input:not([type=checkbox]),select,textarea{box-sizing:border-box;width:100%;background:#0f1a13;color:white;border:1px solid #506c55;border-radius:8px;padding:12px;margin-top:7px;font:inherit}
  input[type=color]{height:52px}.two{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+ .catalog-layout{display:grid;grid-template-columns:1fr 1.3fr;gap:14px;margin-top:16px}
+ .catalog-list{max-height:380px;overflow:auto}.catalog-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px;border-bottom:1px solid #3a5340}
+ .catalog-row small{display:block;color:#a5bda9;margin-top:5px}.catalog-row button{padding:9px;font-size:12px}
+ .map-canvas{height:380px;border-radius:12px;overflow:hidden}.map-preview{min-width:0}
+ @media(max-width:700px){.catalog-layout{grid-template-columns:1fr}.catalog-list{max-height:220px}}
  .chips{display:flex;flex-wrap:wrap;gap:12px}.chips label{padding:10px;border:1px solid #4a634e;border-radius:8px;display:flex;gap:8px}
  button{background:#c4f1b6;color:#102115;padding:14px 24px;border:0;border-radius:9px;font-weight:700;cursor:pointer}
  button:disabled{opacity:.5}.actions{display:flex;align-items:center;gap:18px}.alert,.notice{padding:15px;border-radius:9px;background:#522b2b}.notice{background:#244c2b}
  @media(max-width:600px){.two{grid-template-columns:1fr}.actions{flex-wrap:wrap}}
  `]
 })
-export class GuideEditorComponent implements OnInit {
+export class GuideEditorComponent implements OnInit, AfterViewChecked, OnDestroy {
+ @ViewChild('catalogMap') catalogMap?:ElementRef<HTMLDivElement>;
+ private map?:maplibregl.Map;
+ private markers:maplibregl.Marker[]=[];
+ catalogResults:CatalogPlace[]=[];
+ catalogSearch='';catalogKind:'poi'|'event'='poi';searching=false;
  vertical='hotel';id='';ready=false;busy=false;error='';notice='';token='';logo='';poiText='';eventText='';
  organizations:{id:string;name:string;businessType:string;role:string}[]=[];
  availableCategories=[
@@ -86,11 +113,51 @@ export class GuideEditorComponent implements OnInit {
     if(!this.organizations.some(o=>o.id===data.organizationId))throw Error('Nincs jogosultság ehhez a munkaterülethez.');
     this.form=data;
     this.logo=data.branding.logoUrl||'';
-    this.poiText=data.poiIds.join('\\n');
-    this.eventText=data.eventIds.join('\\n');
+    this.poiText=data.poiIds.join('\n');
+    this.eventText=data.eventIds.join('\n');
    }else if(this.organizations.length){this.form.organizationId=this.organizations[0].id;}
    this.ready=true;
   }catch(e){this.error=e instanceof Error?e.message:'Betöltési hiba';}
+ }
+ ngAfterViewChecked(){
+  if(!this.map&&this.catalogMap&&this.ready){
+   this.map=new maplibregl.Map({container:this.catalogMap.nativeElement,style:MAP_STYLE,center:this.form.map.center,zoom:this.form.map.zoom});
+   this.map.addControl(new maplibregl.NavigationControl({showCompass:false}),'top-right');
+   this.map.on('moveend',()=>{
+    if(this.map){const center=this.map.getCenter();this.form.map.center=[Number(center.lng.toFixed(5)),Number(center.lat.toFixed(5))];this.form.map.zoom=Number(this.map.getZoom().toFixed(1));}
+   });
+  }
+ }
+ ngOnDestroy(){this.markers.forEach(m=>m.remove());this.map?.remove();}
+ isSelected(place:CatalogPlace){return (place.kind==='poi'?this.form.poiIds:this.form.eventIds).includes(place.id);}
+ togglePlace(place:CatalogPlace){
+  const ids=place.kind==='poi'?this.form.poiIds:this.form.eventIds;
+  const next=ids.includes(place.id)?ids.filter(id=>id!==place.id):[...ids,place.id];
+  if(next.length>250){this.error='Legfeljebb 250 elem választható típusonként.';return;}
+  if(place.kind==='poi'){this.form.poiIds=next;this.poiText=next.join('\n');}
+  else {this.form.eventIds=next;this.eventText=next.join('\n');}
+  this.drawCatalogMarkers();
+ }
+ async searchCatalog(){
+  this.searching=true;this.error='';
+  try{
+   const query=new URLSearchParams({kind:this.catalogKind,q:this.catalogSearch,lng:String(this.form.map.center[0]),
+    lat:String(this.form.map.center[1]),radiusKm:'30',limit:'40'});
+   const response:{items:CatalogPlace[]}=await this.session.request('/api/partner/catalog?'+query.toString());
+   this.catalogResults=response.items;this.drawCatalogMarkers();
+  }catch(e){this.error=e instanceof Error?e.message:'A keresés sikertelen.';}
+  finally{this.searching=false;}
+ }
+ private drawCatalogMarkers(){
+  this.markers.forEach(m=>m.remove());this.markers=[];
+  if(!this.map)return;
+  for(const place of this.catalogResults){
+   const node=document.createElement('button');node.type='button';node.textContent=this.isSelected(place)?'✓':'+';
+   node.setAttribute('aria-label',place.title);
+   node.style.cssText='width:30px;height:30px;border-radius:50%;background:#287d59;color:white;border:2px solid white;cursor:pointer';
+   node.addEventListener('click',()=>this.togglePlace(place));
+   this.markers.push(new maplibregl.Marker({element:node}).setLngLat(place.coordinates).addTo(this.map));
+  }
  }
  toggleCategory(category:string,event:Event){
   const checked=(event.target as HTMLInputElement).checked;
