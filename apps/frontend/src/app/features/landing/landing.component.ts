@@ -1,6 +1,7 @@
 import { AfterViewInit, Component, ElementRef, HostListener, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
+import { AdSlotComponent } from '../../shared/ads/ad-slot.component';
 import { CountyArtComponent } from './county-art.component';
 import { LucideAngularModule } from 'lucide-angular';
 import { ICONS } from '../../shared/icons/icons';
@@ -13,7 +14,7 @@ import { LEGAL_LINKS, SOCIAL_LINKS } from '../../core/config/site.config';
   selector: 'app-landing',
   standalone: true,
   imports: [
-    CommonModule, RouterLink, CountyArtComponent, AttributionDialogComponent, CategoryIconComponent,
+    CommonModule, RouterLink, AdSlotComponent, CountyArtComponent, AttributionDialogComponent, CategoryIconComponent,
     LucideAngularModule,
   ],
   templateUrl: './landing.component.html',
