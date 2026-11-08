@@ -33,6 +33,9 @@ export class IngestionService {
    * Run a data adapter and ingest its data.
    */
   async ingestData(adapter: DataAdapter): Promise<IngestionResult> {
+    if (process.env.MOMAP_INGESTION_ENABLED !== 'true') {
+      throw new Error('Ingestion disabled until compliance and staging review');
+    }
     const jobRecord = await this.createJobRecord(adapter.name);
     const startedAt = new Date();
 
@@ -137,6 +140,9 @@ export class IngestionService {
     sourceAdapter: string,
     record: RawEventData,
   ): Promise<{ created: boolean; updated: boolean }> {
+    if (!record.sourceUrl || !record.licenseType || !record.attribution) {
+      throw new Error('Missing source URL, license or attribution');
+    }
     const countyId = await this.resolveCountyId(record.settlement);
     if (!countyId) {
       throw new Error(`No county found for settlement: ${record.settlement}`);
@@ -169,9 +175,9 @@ export class IngestionService {
     if (existing) {
       // Update existing record (location updated via raw SQL if coordinates available)
       await this.eventRepo.update(existing.id, eventData);
-      if (record.latitude && record.longitude) {
+      if (record.latitude !== undefined && record.longitude !== undefined) {
         await this.eventRepo.query(
-          `UPDATE events SET location = ST_GeomFromText('POINT(? ?)', 4326) WHERE id = ?`,
+          `UPDATE events SET location = ST_SetSRID(ST_MakePoint($1, $2), 4326) WHERE id = $3`,
           [record.longitude, record.latitude, existing.id],
         );
       }
@@ -218,13 +224,16 @@ export class IngestionService {
       website: record.website,
       source: sourceAdapter,
       sourceId: record.externalId,
+      attribution: record.attribution,
+      importedAt: new Date(),
+      externalRefs: { sourceUrl: record.sourceUrl!, license: record.licenseType! },
     };
 
     if (existing) {
       await this.poiRepo.update(existing.id, poiData);
       // Update location via raw SQL
       await this.poiRepo.query(
-        `UPDATE pois SET location = ST_GeomFromText('POINT(? ?)', 4326) WHERE id = ?`,
+        `UPDATE pois SET location = ST_SetSRID(ST_MakePoint($1, $2), 4326) WHERE id = $3`,
         [record.longitude, record.latitude, existing.id],
       );
       return { created: false, updated: true };
