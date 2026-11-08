@@ -112,7 +112,7 @@ export class AccessService {
   if(identity.role!=='admin')throw new ForbiddenException();
   const [events,pois]=await Promise.all([
    this.db.query(`SELECT id,title,venue,settlement,source,"sourceUrl" AS "sourceUrl",
-                         "startTime" AS "startTime" FROM events
+                         "startTime" AS "startTime", location IS NOT NULL AS "hasLocation" FROM events
       WHERE status='draft' ORDER BY "startTime" ASC LIMIT 100`),
    this.db.query(`SELECT id,name,category,source,"moderationStatus" AS "moderationStatus",
                          attribution FROM pois
@@ -130,7 +130,7 @@ export class AccessService {
    const rows:{id:string}[]=await manager.query(
     `UPDATE events SET status=$2,"statusChangedAt"=NOW()
        WHERE id=$1 AND status='draft' AND
-         ($2='rejected' OR "startTime" >= (NOW() AT TIME ZONE 'Europe/Budapest'))
+         ($2='rejected' OR ("startTime" >= (NOW() AT TIME ZONE 'Europe/Budapest') AND location IS NOT NULL))
        RETURNING id`,[id,decision==='approve'?'active':'rejected']);
    if(!rows[0])throw new BadRequestException('Event not pending review or no longer upcoming');
    await manager.query(`INSERT INTO momap_content_review_log(entity_kind,entity_id,action,actor_id)
