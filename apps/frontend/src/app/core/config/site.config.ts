@@ -23,4 +23,4 @@ export interface LegalLink {
   url?: string;
 }
 
-export const LEGAL_LINKS: LegalLink[] = [];
+export const LEGAL_LINKS: LegalLink[] = [{label:'Adatkezelés (tervezet)',route:'/adatvedelem'},{label:'Sütikezelés',route:'/sutik'},{label:'Impresszum (tervezet)',route:'/impresszum'}];
