@@ -53,7 +53,7 @@ export class WikidataAdapter implements DataAdapter {
       return pois;
     } catch (error) {
       this.logger.error(`Wikidata fetch failed: ${error}`);
-      return [];
+      throw error;
     } finally {
       clearTimeout(timeoutId);
     }
@@ -79,7 +79,7 @@ export class WikidataAdapter implements DataAdapter {
     // Simplified to Debrecen/Hajdú-Bihar area
     return `
 SELECT ?item ?itemLabel ?itemDescription ?coord ?image ?website WHERE {
-  ?item wdt:P131 wd:Q28 .
+  ?item wdt:P131* wd:Q18533 .
   ?item wdt:P625 ?coord .
   {
     ?item wdt:P31 wd:Q33506 .
