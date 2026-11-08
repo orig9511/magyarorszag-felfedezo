@@ -42,7 +42,7 @@ export const CATEGORIES: {
   {
     key: 'attraction',
     name: 'Látnivalók',
-    text: 'Kastélyok, múzeumok, városok',
+    text: 'Helyi történetek, látnivalók és városok',
     picture: pic('debrecen', [800, 1600], 'A debreceni Református Nagytemplom két tornyos, sárga homlokzata', {
       author: 'Pudelek (Marcin Szala)',
       license: 'CC BY-SA 3.0',
@@ -53,7 +53,7 @@ export const CATEGORIES: {
   {
     key: 'restaurant',
     name: 'Éttermek',
-    text: 'Helyi ízek, különleges helyek',
+    text: 'Ízek és vendéglátóhelyek a közelben',
     picture: pic('langos', [800, 1600], 'Sajtos-tejfölös lángos', {
       author: 'sikeri',
       license: 'CC BY-SA 4.0',
@@ -64,7 +64,7 @@ export const CATEGORIES: {
   {
     key: 'accommodation',
     name: 'Szállások',
-    text: 'Hotelek, vendégházak, apartmanok',
+    text: 'Szálláshelyek és helyi vendégélmények',
     picture: pic('hotel', [800, 1600], 'Kétágyas szállodai szoba egy magyarországi szállodában', {
       author: 'Hotel Makár (Wikimedia Commons)',
       license: 'CC BY-SA 3.0',
@@ -75,7 +75,7 @@ export const CATEGORIES: {
   {
     key: 'event',
     name: 'Események',
-    text: 'Fesztiválok, koncertek, programok',
+    text: 'Kulturális és közösségi programok',
     picture: pic('sziget', [800, 1600], 'Fesztiválközönség a színpad előtt a Szigeten', {
       author: 'Derzsi Elekes Andor',
       license: 'CC BY-SA 4.0',
@@ -86,7 +86,7 @@ export const CATEGORIES: {
   {
     key: 'nature',
     name: 'Természet',
-    text: 'Túrázás, vízpartok, szabadtéri élmények',
+    text: 'Túrák, tájak és szabadtéri programok',
     picture: pic('hortobagy', [800, 1600], 'Végtelen zöld puszta a Hortobágyi Nemzeti Parkban', {
       author: 'Krzysztof Ziarnek, Kenraiz',
       license: 'CC BY-SA 4.0',
@@ -189,9 +189,9 @@ export const INSPIRATIONS: Inspiration[] = [
 ];
 
 export const STEPS = [
-  { title: 'Válassz vármegyét', text: 'A térkép Magyarország valódi közigazgatási határait mutatja. Egy kattintással egy régióra közelítesz.' },
-  { title: 'Fedezz fel szabadon', text: 'Nagyíts és mozgasd a térképet: a találatok az éppen látható területhez igazodnak.' },
-  { title: 'Szűrj kategóriára', text: 'Látnivalók, éttermek, szállások, események vagy természet: csak azt látod, amit keresel.' },
+  { title: 'Indulj el a térképen', text: 'A térkép Magyarország valódi közigazgatási határait mutatja. Egy kattintással egy régióra közelítesz.' },
+  { title: 'Találj helyi élményeket', text: 'Nagyíts és mozgasd a térképet: a találatok az éppen látható területhez igazodnak.' },
+  { title: 'Válaszd ki, ami érdekel', text: 'Látnivalók, éttermek, szállások, események vagy természet: csak azt látod, amit keresel.' },
 ];
 
 /** Every credit shown in the footer. */

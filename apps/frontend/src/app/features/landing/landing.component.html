@@ -8,9 +8,10 @@
     </a>
 
     <nav class="nav-desktop" aria-label="Főmenü">
-      <a href="#kiemelt" (click)="scrollTo('kiemelt', $event)">Kiemelt helyek</a>
+      <a href="#kiemelt" (click)="scrollTo('kiemelt', $event)">Felfedezés</a>
       <a href="#kategoriak" (click)="scrollTo('kategoriak', $event)">Kategóriák</a>
       <a href="#hogyan" (click)="scrollTo('hogyan', $event)">Hogyan működik?</a>
+      <a href="#partnerek" (click)="scrollTo('partnerek', $event)">Vállalkozásoknak</a>
     </nav>
 
     <a class="btn btn-primary btn-sm nav-cta" routerLink="/explore">Térkép megnyitása <lucide-icon [img]="icons.ArrowRight" [size]="18" [strokeWidth]="2"></lucide-icon></a>
@@ -31,6 +32,7 @@
     <a href="#kiemelt" (click)="scrollTo('kiemelt', $event)">Kiemelt helyek</a>
     <a href="#kategoriak" (click)="scrollTo('kategoriak', $event)">Kategóriák</a>
     <a href="#hogyan" (click)="scrollTo('hogyan', $event)">Hogyan működik?</a>
+    <a href="#partnerek" (click)="scrollTo('partnerek', $event)">Vállalkozásoknak</a>
     <a class="btn btn-primary" routerLink="/explore" (click)="menuOpen = false">Térkép megnyitása <lucide-icon [img]="icons.ArrowRight" [size]="18" [strokeWidth]="2"></lucide-icon></a>
   </nav>
 </header>
@@ -52,23 +54,22 @@
 
     <div class="wrap hero-grid">
       <div class="hero-copy">
-        <p class="eyebrow">Térképalapú felfedezőplatform</p>
-        <h1 id="hero-title">Magyarország, amit még <em>nem ismersz.</em></h1>
+        <p class="eyebrow">Momap · Felfedezés és digitális vendégélmény</p>
+        <h1 id="hero-title">Fedezd fel a környéket. <em>Mutasd meg a legjobbját.</em></h1>
         <p class="lead">
-          Fedezz fel helyeket, élményeket, eseményeket, éttermeket és rejtett kincseket az ország minden szegletében,
-          egyetlen térképen.
+          A Momap összeköti az utazókat a helyi élményekkel, a szálláshelyeket és vállalkozásokat pedig a vendégeikkel. Fedezz fel a térképen, vagy állíts össze saját, megosztható vendégajánlót.
         </p>
         <div class="cta-row">
           <a class="btn btn-primary" routerLink="/explore">Felfedezés indítása <lucide-icon [img]="icons.ArrowRight" [size]="18" [strokeWidth]="2"></lucide-icon></a>
-          <a class="btn btn-ghost" href="#hogyan" (click)="scrollTo('hogyan', $event)">Hogyan működik?</a>
+          <a class="btn btn-ghost" href="#partnerek" (click)="scrollTo('partnerek', $event)">Momap vállalkozásoknak</a>
         </div>
 
         <div class="facts">
           <p class="fact-county" *ngIf="countyCount !== null"><strong>{{ countyCount }}</strong> régió határa betöltve</p>
           <ul class="themes" aria-label="Témák">
-            <li>Természeti élmények</li>
-            <li>Események</li>
-            <li>Helyi ízek</li>
+            <li>Helyi felfedezés</li>
+            <li>Vendégtérképek</li>
+            <li>Partneri ajánlók</li>
           </ul>
         </div>
       </div>
@@ -90,8 +91,8 @@
   <section id="kategoriak" class="section categories" aria-labelledby="cat-title" tabindex="-1">
     <div class="wrap">
       <div class="section-head reveal">
-        <p class="eyebrow">Felfedezési kategóriák</p>
-        <h2 id="cat-title">Válassz élményt, és indulj útnak</h2>
+        <p class="eyebrow">Momap Explore</p>
+        <h2 id="cat-title">A környék legjobb helyei, egyetlen térképen</h2>
       </div>
       <ul class="cat-grid">
         <li class="reveal" *ngFor="let c of categories">
@@ -122,8 +123,8 @@
   <section id="kiemelt" class="section featured" aria-labelledby="featured-title" tabindex="-1">
     <div class="wrap">
       <div class="section-head reveal">
-        <p class="eyebrow">Kiemelt helyek</p>
-        <h2 id="featured-title">Inspiráció a következő utadhoz</h2>
+        <p class="eyebrow">Felfedezési ötletek</p>
+        <h2 id="featured-title">Ötletek a következő felfedezéshez</h2>
         <p class="lead small">
           Szerkesztői ötletek, nem ajánlatok és nem foglalható programok. A kártyák a térképen az adott kategóriát vagy
           vármegyét nyitják meg; csak a ténylegesen feltöltött helyek jelennek meg.
@@ -162,7 +163,7 @@
   <section id="hogyan" class="section how" aria-labelledby="how-title" tabindex="-1">
     <div class="wrap">
       <div class="section-head reveal">
-        <p class="eyebrow">Hogyan működik?</p>
+        <p class="eyebrow">Momap Explore · Így működik</p>
         <h2 id="how-title">Három lépés a felfedezésig</h2>
       </div>
       <ol class="steps">
@@ -175,15 +176,52 @@
     </div>
   </section>
 
+  <!-- BUSINESS / PARTNER VALUE PROPOSITION -->
+  <section id="partnerek" class="section business" aria-labelledby="business-title" tabindex="-1">
+    <div class="wrap">
+      <div class="business-intro reveal">
+        <div>
+          <p class="eyebrow">Momap Business · Partnerprogram</p>
+          <h2 id="business-title">A környék élményei. <em>A te ajánlásoddal.</em></h2>
+          <p class="lead">Adj vendégeidnek többet egy szokásos térképnél. Állíts össze saját arculatú digitális vendégtérképet helyi látnivalókból, éttermekből, programokból és szolgáltatásokból.</p>
+          <p class="business-disclaimer">A partnerprogram fejlesztés alatt áll. A regisztráció jóváhagyáshoz kötött, a funkciók elérhetősége változhat.</p>
+        </div>
+        <div class="business-preview" aria-label="Vendégtérkép folyamatának bemutatása">
+          <span class="preview-label">MOMAP / BUSINESS</span>
+          <div class="preview-window">
+            <div class="preview-top"><span>SAJÁT VENDÉGTÉRKÉP</span><span class="preview-dot"></span></div>
+            <h3>A vendégeidnek ajánlott helyek</h3>
+            <p>Válassz helyszíneket, alakítsd a megjelenést, és oszd meg a vendégeiddel.</p>
+            <div class="preview-pins"><span>⌖ Látnivalók</span><span>◉ Éttermek</span><span>◇ Programok</span></div>
+            <div class="preview-steps"><span>1. Összeállítás</span><span>2. Jóváhagyás</span><span>3. Megosztás</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="business-benefits">
+        <article class="business-benefit reveal"><span class="benefit-number">01</span><h3>Saját arculat</h3><p>Vendégtérkép a vállalkozásod nevével, színvilágával és válogatott ajánlásaival.</p></article>
+        <article class="business-benefit reveal"><span class="benefit-number">02</span><h3>Helyi ajánlások</h3><p>Válassz a térképen szereplő helyszínek és események közül. A tartalmak közzététele ellenőrzéshez kötött.</p></article>
+        <article class="business-benefit reveal"><span class="benefit-number">03</span><h3>Megosztható élmény</h3><p>A jóváhagyott vendégtérképed egyedi linken érhető el, mobilon is használható formában.</p></article>
+      </div>
+      <div class="business-verticals reveal" aria-label="Partneri munkaterületek">
+        <div><strong>Szálláshelyeknek</strong><p>Helyi tippek a vendégeknek, a szállástól a programokig.</p><a routerLink="/access/hotel">Szálláshelyi hozzáférés</a></div>
+        <div><strong>Éttermeknek</strong><p>Segíts a vendégeknek felfedezni a környék további értékeit.</p><a routerLink="/access/restaurant">Éttermi hozzáférés</a></div>
+        <div><strong>Szolgáltatóknak</strong><p>Mutasd be a környékhez kapcsolódó élményeket és lehetőségeket.</p><a routerLink="/access/service">Szolgáltatói hozzáférés</a></div>
+      </div>
+      <div class="business-actions reveal">
+        <a class="btn btn-primary" routerLink="/access/hotel">Partneri hozzáférés <lucide-icon [img]="icons.ArrowRight" [size]="18" [strokeWidth]="2"></lucide-icon></a>
+        <span>A hozzáférés jelenleg pilot jellegű, adminisztrátori jóváhagyással.</span>
+      </div>
+    </div>
+  </section>
+
   <!-- MAP CTA -->
   <section class="section map-cta" aria-labelledby="cta-title">
     <div class="wrap cta-inner reveal">
       <div>
         <p class="eyebrow">Interaktív térkép</p>
-        <h2 id="cta-title">Az egész ország egy térképen.</h2>
+        <h2 id="cta-title">Fedezz fel többet, mint amit kerestél.</h2>
         <p class="lead">
-          Nagyíts, mozgasd, válassz vármegyét, és nézd meg, mi van a közelben. Nincs kötelező városválasztás: te
-          döntöd el, merre indulsz.
+          Indulj el a térképen, válassz térséget és kategóriát, és nézd meg az elérhető helyszíneket. A Momap folyamatosan bővülő felfedezési felület.
         </p>
       </div>
       <a class="btn btn-primary btn-lg" routerLink="/explore">Térkép megnyitása <lucide-icon [img]="icons.ArrowRight" [size]="18" [strokeWidth]="2"></lucide-icon></a>
@@ -199,13 +237,15 @@
           <lucide-icon [img]="icons.MapPin" [size]="22" [strokeWidth]="1.75"></lucide-icon>
           <span>Momap</span>
         </a>
-        <p class="foot-note">Magyarország helyei, programjai és élményei egyetlen térképen.</p>
+        <p class="foot-note">Felfedezés az utazóknak. Digitális vendégélmény a helyi vállalkozásoknak.</p>
       </div>
       <nav aria-label="Lábléc menü">
         <a routerLink="/explore">Térkép</a>
         <a href="#kategoriak" (click)="scrollTo('kategoriak', $event)">Kategóriák</a>
         <a href="#kiemelt" (click)="scrollTo('kiemelt', $event)">Kiemelt helyek</a>
         <a href="#hogyan" (click)="scrollTo('hogyan', $event)">Hogyan működik?</a>
+        <a href="#partnerek" (click)="scrollTo('partnerek', $event)">Vállalkozásoknak</a>
+        <a routerLink="/access/admin">Admin belépés</a>
       </nav>
     </div>
 

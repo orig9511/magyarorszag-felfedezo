@@ -3,7 +3,7 @@ import { Routes } from '@angular/router';
 export const routes: Routes = [
   {
     path: '',
-    title: 'Momap — Magyarország, amit még nem ismersz',
+    title: 'Momap — Felfedezés és digitális vendégtérképek',
     loadComponent: () => import('./features/landing/landing.component').then((m) => m.LandingComponent),
   },
   {
