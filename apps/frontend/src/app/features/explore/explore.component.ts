@@ -59,6 +59,7 @@ export class ExploreComponent implements OnInit, AfterViewInit, OnDestroy {
   private poiCards: ExploreCard[] = [];
   private eventCards: ExploreCard[] = [];
   private eventReload$ = new Subject<void>();
+  // Each viewport is a five-minute data snapshot; no persistent live connection.
   private poiCache = new Map<string, CachedCards>();
   private eventCache = new Map<string, CachedCards>();
 
@@ -150,7 +151,7 @@ export class ExploreComponent implements OnInit, AfterViewInit, OnDestroy {
         if (this.contentMode === 'events') { this.poiCards = []; return of([] as ExploreCard[]); }
         const key = viewportKey(v, categories);
         const cached = this.poiCache.get(key);
-        if (cached && Date.now() - cached.at < 60000) return of(cached.cards);
+        if (cached && Date.now() - cached.at < 300000) return of(cached.cards);
         this.poiCards = visiblePlaces(this.poiCards, v).filter(card => !categories.length || categories.includes(card.category));
         this.publishResults();
         return this.poiService.getPOIsByViewport(v.minLat, v.maxLat, v.minLng, v.maxLng, categories.length ? categories : undefined).pipe(
@@ -172,7 +173,7 @@ export class ExploreComponent implements OnInit, AfterViewInit, OnDestroy {
         const dateOptions = this.getEventDateOptions();
         const key = viewportKey(v, [this.eventDatePreset, JSON.stringify(dateOptions)]);
         const cached = this.eventCache.get(key);
-        if (cached && Date.now() - cached.at < 60000) return of(cached.cards);
+        if (cached && Date.now() - cached.at < 300000) return of(cached.cards);
         return this.eventService.getEventsByViewport(v.minLat, v.minLng, v.maxLat, v.maxLng, dateOptions).pipe(
           map(events => visiblePlaces(events.map(e => this.eventToCard(e)), v)),
           tap(cards => this.cacheCards(this.eventCache, key, cards)),
