@@ -245,16 +245,11 @@ export class IngestionService {
 
     if (existing) {
       await this.poiRepo.update(existing.id, poiData);
-      // Update location via raw SQL
-      await this.poiRepo.query(
-        `UPDATE pois SET location = ST_SetSRID(ST_MakePoint($1, $2), 4326) WHERE id = $3`,
-        [record.longitude, record.latitude, existing.id],
-      );
       return { created: false, updated: true };
     } else {
       // Create new record
       const poi = this.poiRepo.create(poiData);
-      const saved = await this.poiRepo.save(poi);
+      await this.poiRepo.save(poi);
       return { created: true, updated: false };
     }
   }
