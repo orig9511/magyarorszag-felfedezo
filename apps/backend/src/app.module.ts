@@ -7,6 +7,7 @@ import { EventModule } from "./modules/event/event.module";
 import { SettlementModule } from "./modules/settlement/settlement.module";
 import { IngestionModule } from "./modules/ingestion/ingestion.module";
 import { AdminModule } from "./modules/admin/admin.module";
+import { GuidesModule } from "./modules/guides/guides.module";
 import { environmentFiles, requireDatabaseUrl } from "./environment.config";
 
 @Module({
@@ -35,6 +36,7 @@ import { environmentFiles, requireDatabaseUrl } from "./environment.config";
     SettlementModule,
     IngestionModule,
     AdminModule,
+    GuidesModule,
   ],
 })
 export class AppModule {}

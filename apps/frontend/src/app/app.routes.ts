@@ -12,5 +12,10 @@ export const routes: Routes = [
     title: 'Térkép — Momap',
     loadComponent: () => import('./features/explore/explore.component').then((m) => m.ExploreComponent),
   },
+  {
+    path: 'g/:slug',
+    title: 'Vendégtérkép — Momap',
+    loadComponent: () => import('./features/guest-guide/guest-guide.component').then(m => m.GuestGuideComponent),
+  },
   { path: '**', redirectTo: '' },
 ];
