@@ -12,7 +12,8 @@ export function eventLocalDay(value:Date):string {
 }
 export function eventFingerprint(record:Pick<RawEventData,'title'|'startTime'|'venue'|'settlement'>):string|null {
  const title=normalizeEventText(record.title);
- const place=normalizeEventText(record.venue)||normalizeEventText(record.settlement);
+ // Settlement alone is too broad: different events can share title/day/city.
+ const place=normalizeEventText(record.venue);
  if(title.length<5||place.length<3)return null;
  const canonical=[title,eventLocalDay(record.startTime),place].join('|');
  return createHash('sha256').update(canonical).digest('hex');
