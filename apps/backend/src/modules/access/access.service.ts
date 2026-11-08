@@ -106,6 +106,52 @@ export class AccessService {
   if(!result[0]) throw new BadRequestException("Account not pending");
   return {ok:true};
  }
+
+ /** Source moderation is restricted to verified platform administrators. */
+ async dataReviewQueue(identity:AccessIdentity) {
+  if(identity.role!=='admin')throw new ForbiddenException();
+  const [events,pois]=await Promise.all([
+   this.db.query(`SELECT id,title,venue,settlement,source,"sourceUrl" AS "sourceUrl",
+                         "startTime" AS "startTime" FROM events
+      WHERE status='draft' ORDER BY "startTime" ASC LIMIT 100`),
+   this.db.query(`SELECT id,name,category,source,"moderationStatus" AS "moderationStatus",
+                         attribution FROM pois
+      WHERE "moderationStatus"='quarantined'
+         OR ("ownerId" IS NULL AND source IN ('osm_overpass','wikidata') AND
+            (length(trim(name))=0 OR "externalRefs" IS NULL OR attribution IS NULL))
+      ORDER BY name ASC LIMIT 100`),
+  ]);
+  return {events,pois};
+ }
+ async reviewEvent(identity:AccessIdentity,id:string,decision:'approve'|'reject') {
+  if(identity.role!=='admin')throw new ForbiddenException();
+  if(!/^[0-9a-f-]{36}$/i.test(id))throw new BadRequestException('Invalid event ID');
+  return this.db.transaction(async manager=>{
+   const rows:{id:string}[]=await manager.query(
+    `UPDATE events SET status=$2,"statusChangedAt"=NOW()
+       WHERE id=$1 AND status='draft' AND
+         ($2='rejected' OR "startTime" >= (NOW() AT TIME ZONE 'Europe/Budapest'))
+       RETURNING id`,[id,decision==='approve'?'active':'rejected']);
+   if(!rows[0])throw new BadRequestException('Event not pending review or no longer upcoming');
+   await manager.query(`INSERT INTO momap_content_review_log(entity_kind,entity_id,action,actor_id)
+                       VALUES ('event',$1,$2,$3)`,[id,decision,identity.id]);
+   return {ok:true};
+  });
+ }
+ async reviewPoi(identity:AccessIdentity,id:string,decision:'quarantine'|'restore') {
+  if(identity.role!=='admin')throw new ForbiddenException();
+  if(!/^[0-9a-f-]{36}$/i.test(id))throw new BadRequestException('Invalid POI ID');
+  return this.db.transaction(async manager=>{
+   const rows:{id:string}[]=await manager.query(
+    `UPDATE pois SET "moderationStatus"=$2
+       WHERE id=$1 AND "moderationStatus"<>$2 RETURNING id`,
+    [id,decision==='quarantine'?'quarantined':'active']);
+   if(!rows[0])throw new BadRequestException('POI unavailable or already in requested state');
+   await manager.query(`INSERT INTO momap_content_review_log(entity_kind,entity_id,action,actor_id)
+                       VALUES ('poi',$1,$2,$3)`,[id,decision,identity.id]);
+   return {ok:true};
+  });
+ }
  /** One-time local bootstrap. Must never be callable from HTTP. */
  async bootstrapAdmin():Promise<void> {
   const email=this.config.get<string>("MOMAP_BOOTSTRAP_ADMIN_EMAIL");
