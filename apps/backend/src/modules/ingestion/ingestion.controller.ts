@@ -10,6 +10,7 @@ import {
 } from "@nestjs/common";
 import { IngestionService } from "./ingestion.service";
 import { DataRetentionService } from "./data-retention.service";
+import { assertSourceApproved } from "./source-policy";
 import { AdminTokenGuard } from '../auth/admin-token.guard';
 import { OSMAdapter } from "./adapters/osm.adapter";
 import { WikidataAdapter } from "./adapters/wikidata.adapter";
@@ -60,6 +61,16 @@ export class IngestionController {
         error: error instanceof Error ? error.message : String(error),
       };
     }
+  }
+
+  /** Costs Firecrawl credits but never writes to the Momap database. */
+  @Post("ticket/preview")
+  async previewTicketCandidates(){
+    if(process.env.MOMAP_TICKET_SCRAPE_ENABLED!=='true')
+      throw new BadRequestException('Ticket collection disabled');
+    assertSourceApproved('firecrawl_ticket');
+    const events=await this.firecrawlTicket.fetchData();
+    return {total:events.length,events:events.slice(0,50),truncated:events.length>50};
   }
 
   /** Read-only preview; requires the existing operator guard. */
