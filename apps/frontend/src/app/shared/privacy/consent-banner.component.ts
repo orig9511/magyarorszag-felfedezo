@@ -1,9 +1,10 @@
 import { CommonModule } from '@angular/common';
 import { Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { FormsModule } from '@angular/forms';
 import { ConsentService } from '../../core/privacy/consent.service';
 @Component({
- selector:'app-consent-banner',standalone:true,imports:[CommonModule,RouterLink],
+ selector:'app-consent-banner',standalone:true,imports:[CommonModule,RouterLink,FormsModule],
  template:`
  <section *ngIf="!consent.decided || settingsOpen" class="consent" aria-label="Adatvédelmi beállítások">
   <div class="copy"><strong>Adatvédelem és sütik</strong>
