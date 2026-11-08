@@ -12,7 +12,7 @@ function nodes(value:unknown,depth=0):Dict[]{
 }
 function isEvent(v:Dict):boolean{
  const type=v['@type'];
- return (Array.isArray(type)?type:[type]).some(t=>typeof t==='string'&&/^(?:https?:\/\/schema.org\/)?Event$/.test(t));
+ return (Array.isArray(type)?type:[type]).some(t=>typeof t==='string'&&/^(?:https?:\/\/schema.org\/)?(?:[A-Za-z]*Event)$/.test(t));
 }
 function extractVenue(value:unknown):{name?:string;settlement?:string}{
  if(!obj(value))return {};
@@ -42,14 +42,21 @@ export function extractTicketEvents(
    const startTime=new Date(date);
    if(!Number.isFinite(startTime.getTime()))continue;
    const end=str(item.endDate);
+   if(end&&!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?(?:Z|[+-]\d{2}:\d{2})$/i.test(end))continue;
    const endTime=end?new Date(end):undefined;
    if(endTime&&!Number.isFinite(endTime.getTime()))continue;
-   if(endTime&&endTime<startTime)continue;
+   if(endTime&&endTime.getTime()<startTime.getTime())continue;
    const url=str(item.url);
    let canonical=base.href;
    if(url){
     try{const candidate=new URL(url,base);if(candidate.protocol==='https:'&&candidate.hostname===base.hostname) canonical=candidate.href;}catch{}
    }
+   const normalizedUrl=new URL(canonical);
+   for(const key of [...normalizedUrl.searchParams.keys()]){
+    if(/^utm_|^(?:fbclid|gclid|affiliate_code)$/i.test(key))normalizedUrl.searchParams.delete(key);
+   }
+   normalizedUrl.hash='';
+   canonical=normalizedUrl.href;
    const stable=createHash('sha256').update(canonical+'|'+startTime.toISOString()).digest('hex').slice(0,40);
    if(seen.has(stable))continue;
    seen.add(stable);
