@@ -9,6 +9,7 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import { IngestionService } from "./ingestion.service";
+import { DataRetentionService } from "./data-retention.service";
 import { AdminTokenGuard } from '../auth/admin-token.guard';
 import { OSMAdapter } from "./adapters/osm.adapter";
 import { WikidataAdapter } from "./adapters/wikidata.adapter";
@@ -18,6 +19,7 @@ import { WikidataAdapter } from "./adapters/wikidata.adapter";
 export class IngestionController {
   constructor(
     private ingestionService: IngestionService,
+    private retention: DataRetentionService,
     private osmAdapter: OSMAdapter,
     private wikidataAdapter: WikidataAdapter,
   ) {}
@@ -55,6 +57,10 @@ export class IngestionController {
       };
     }
   }
+
+  /** Read-only preview; requires the existing operator guard. */
+  @Get("retention/preview")
+  async previewRetention(){ return this.retention.preview(); }
 
   /**
    * Get ingestion job history.
