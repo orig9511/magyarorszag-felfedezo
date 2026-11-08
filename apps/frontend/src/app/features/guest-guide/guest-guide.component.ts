@@ -1,5 +1,6 @@
 import { AfterViewInit, Component, ElementRef, OnDestroy, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { GuideQrComponent } from '../../shared/guide-qr/guide-qr.component';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import maplibregl from 'maplibre-gl';
 import { MAP_STYLE } from '../../core/config/map-style';
@@ -22,7 +23,7 @@ interface GuestGuide {
 @Component({
   selector: 'app-guest-guide',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, GuideQrComponent, RouterLink],
   template: `
     <main class="guest-page">
       <header class="guest-header">
@@ -36,11 +37,12 @@ interface GuestGuide {
           <img *ngIf="guide.branding.logoUrl" [src]="guide.branding.logoUrl" alt="" width="44" height="44" referrerpolicy="no-referrer" />
           <div><p>Fedezd fel a környéket</p><h1>{{ guide.branding.title }}</h1></div>
         </div>
-        <div class="guest-sharing">
+        <div class="guest-sharing"><button type="button" (click)="showQr=!showQr">{{showQr?'QR-kód bezárása':'QR-kód'}}</button>
           <button type="button" (click)="shareGuide()">Megosztás</button>
           <button type="button" (click)="copyGuideLink()">Link másolása</button>
           <span *ngIf="shareMessage" role="status">{{shareMessage}}</span>
         </div>
+        <app-guide-qr *ngIf="showQr && guide" [url]="guideUrl()" [filename]="guide.slug" />
         <div class="guest-controls"><button (click)="selectedCategory='all';renderPlaces()" [class.active]="selectedCategory==='all'">Összes</button><button *ngFor="let cat of categories" (click)="selectedCategory=cat;renderPlaces()" [class.active]="selectedCategory===cat">{{cat}}</button></div>
         <p class="guest-note" *ngIf="places.length===0">Ehhez a térképhez még nincs megjeleníthető helyszín.</p>
         <div class="guest-layout">
@@ -89,7 +91,8 @@ export class GuestGuideComponent implements AfterViewInit, OnDestroy {
   places: GuestPlace[] = [];
   selectedCategory = 'all';
   shareMessage = '';
-  private guideUrl():string { return new URL('/g/'+encodeURIComponent(this.guide!.slug),window.location.origin).href; }
+  showQr = false;
+  guideUrl():string { return new URL('/g/'+encodeURIComponent(this.guide!.slug),window.location.origin).href; }
   async copyGuideLink():Promise<void>{
     if(!this.guide)return;
     try{await navigator.clipboard.writeText(this.guideUrl());this.shareMessage='A vendégtérkép hivatkozása másolva.';}
