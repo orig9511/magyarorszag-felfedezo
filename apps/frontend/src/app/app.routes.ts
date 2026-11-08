@@ -17,5 +17,10 @@ export const routes: Routes = [
     title: 'Vendégtérkép — Momap',
     loadComponent: () => import('./features/guest-guide/guest-guide.component').then(m => m.GuestGuideComponent),
   },
+  {
+    path: 'access/:vertical',
+    title: 'Momap Access — Partner és admin felület',
+    loadComponent: () => import('./features/access/access.component').then(m => m.AccessComponent),
+  },
   { path: '**', redirectTo: '' },
 ];
