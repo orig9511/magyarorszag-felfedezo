@@ -9,6 +9,8 @@ interface Identity { id:string;email:string;role:'admin'|'partner';status:string
 interface Organization {id:string;name:string;slug:string;businessType:Vertical;role:string;}
 interface Guide {id:string;slug:string;title:string;published:boolean;organization:string;}
 interface ModeratedGuide {id:string;slug:string;title:string;published:boolean;organization:string;businessType:string;poiCount:number;eventCount:number;}
+interface ReviewEvent {id:string;title:string;venue?:string;settlement:string;source:string;startTime:string;sourceUrl?:string;hasLocation:boolean;}
+interface ReviewPoi {id:string;name:string;category:string;source:string;moderationStatus:'active'|'quarantined';attribution?:string;}
 interface Pending {id:string;email:string;name:string;businessType:Vertical;createdAt:string;}
 @Component({
  selector:'app-access',standalone:true,imports:[CommonModule,FormsModule,RouterLink,GuideQrComponent],
@@ -55,6 +57,22 @@ interface Pending {id:string;email:string;name:string;businessType:Vertical;crea
       </div>
      </div>
      <div class="empty" *ngIf="!moderatedGuides.length">Még nincs vendégtérkép.</div>
+     <div class="section-head"><h2>Adatminőségi moderáció</h2><span class="muted">Karantén, ellenőrzés és jóváhagyás</span></div>
+     <h3>Események ellenőrzése</h3>
+     <div class="item" *ngFor="let event of reviewEvents">
+      <div><strong>{{event.title}}</strong><p>{{event.venue || event.settlement}} · {{event.startTime | date:'yyyy.MM.dd. HH:mm'}} · {{event.source}}</p>
+       <p *ngIf="!event.hasLocation">Hiányzó koordináták — publikálás előtt helyszín-ellenőrzés szükséges.</p>
+       <a *ngIf="safeUrl(event.sourceUrl) as url" [href]="url" target="_blank" rel="noopener noreferrer">Eredeti adatforrás</a>
+      </div>
+      <div class="actions"><button type="button" [disabled]="!event.hasLocation" (click)="reviewEvent(event,true)">Jóváhagyás</button><button type="button" class="danger" (click)="reviewEvent(event,false)">Elutasítás</button></div>
+     </div>
+     <div class="empty" *ngIf="!reviewEvents.length">Nincs felülvizsgálatra váró esemény.</div>
+     <h3>Gyanús vagy karanténba helyezett helyszínek</h3>
+     <div class="item" *ngFor="let poi of reviewPois">
+      <div><strong>{{poi.name || 'Hiányzó név'}}</strong><p>{{poi.category}} · {{poi.source}} · {{poi.moderationStatus==='quarantined'?'Karantén':'Ellenőrzendő'}}</p></div>
+      <div class="actions"><button type="button" class="danger" *ngIf="poi.moderationStatus!=='quarantined'" (click)="reviewPoi(poi,false)">Karantén</button><button type="button" *ngIf="poi.moderationStatus==='quarantined'" (click)="reviewPoi(poi,true)">Visszaállítás</button></div>
+     </div>
+     <div class="empty" *ngIf="!reviewPois.length">Nincs megjelölt helyszín.</div>
     </ng-container>
     <ng-container *ngIf="vertical!=='admin'">
      <div class="stats"><article><span>Szervezetek</span><strong>{{organizations.length}}</strong></article><article><span>Vendégtérképek</span><strong>{{guides.length}}</strong></article><article><span>Publikált</span><strong>{{publishedCount}}</strong></article></div>
@@ -97,7 +115,7 @@ interface Pending {id:string;email:string;name:string;businessType:Vertical;crea
 })
 export class AccessComponent implements OnInit {
  vertical:'admin'|Vertical='hotel';mode:'login'|'register'='login';
- identity?:Identity;organizations:Organization[]=[];guides:Guide[]=[];pending:Pending[]=[];moderatedGuides:ModeratedGuide[]=[];
+ identity?:Identity;organizations:Organization[]=[];guides:Guide[]=[];pending:Pending[]=[];moderatedGuides:ModeratedGuide[]=[];reviewEvents:ReviewEvent[]=[];reviewPois:ReviewPoi[]=[];
  error='';notice='';busy=false;
  get token(){return this.session.token;}
  form={email:'',password:'',name:'',slug:''};
@@ -128,7 +146,7 @@ export class AccessComponent implements OnInit {
  async refresh(){
   if(!this.identity)return;
   try{
-   if(this.vertical==='admin'){const [pending,guides]=await Promise.all([this.request('admin/pending'),this.request('admin/guides')]);this.pending=pending;this.moderatedGuides=guides;return;}
+   if(this.vertical==='admin'){const [pending,guides,review]=await Promise.all([this.request('admin/pending'),this.request('admin/guides'),this.request('admin/review')]);this.pending=pending;this.moderatedGuides=guides;this.reviewEvents=review.events||[];this.reviewPois=review.pois||[];return;}
    const [orgs,guides]=await Promise.all([this.request('organizations'),this.request('guides')]);
    this.organizations=(orgs as Organization[]).filter(o=>o.businessType===this.vertical);
    const allowed=new Set(this.organizations.map(o=>o.id));
@@ -162,6 +180,17 @@ export class AccessComponent implements OnInit {
    this.notice=publish?'A térkép publikálva.':'A térkép visszavonva.';
    await this.refresh();
   }catch(e){this.error=e instanceof Error?e.message:'Sikertelen művelet.';}
+ }
+ safeUrl(value?:string){return value && /^https?:\/\//i.test(value)?value:null;}
+ async reviewEvent(event:ReviewEvent,approve:boolean){
+  if(!confirm(approve?'Ellenőrizted az eseményt és az adatközlési engedélyt? Publikálod?':'Elutasítod ezt az eseményt?'))return;
+  try{await this.request('admin/events/'+event.id+'/'+(approve?'approve':'reject'),'POST');this.notice=approve?'Az esemény jóváhagyva.':'Az esemény elutasítva.';await this.refresh();}
+  catch(e){this.error=e instanceof Error?e.message:'A döntés sikertelen.';}
+ }
+ async reviewPoi(poi:ReviewPoi,restore:boolean){
+  if(!confirm(restore?'Ellenőrizted a helyszín valódiságát és adatait? Visszaállítod?':'Elrejted a helyszínt a nyilvános térképről?'))return;
+  try{await this.request('admin/pois/'+poi.id+'/'+(restore?'restore':'quarantine'),'POST');this.notice=restore?'Helyszín visszaállítva.':'Helyszín karanténba helyezve.';await this.refresh();}
+  catch(e){this.error=e instanceof Error?e.message:'A döntés sikertelen.';}
  }
  async logout(){
   try{if(this.token)await this.request('logout','POST');}catch{}

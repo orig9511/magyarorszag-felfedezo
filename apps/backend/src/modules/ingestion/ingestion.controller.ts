@@ -10,9 +10,11 @@ import {
 } from "@nestjs/common";
 import { IngestionService } from "./ingestion.service";
 import { DataRetentionService } from "./data-retention.service";
+import { assertSourceApproved } from "./source-policy";
 import { AdminTokenGuard } from '../auth/admin-token.guard';
 import { OSMAdapter } from "./adapters/osm.adapter";
 import { WikidataAdapter } from "./adapters/wikidata.adapter";
+import { FirecrawlTicketAdapter } from "./adapters/firecrawl-ticket.adapter";
 
 @UseGuards(AdminTokenGuard)
 @Controller("api/ingestion")
@@ -22,6 +24,7 @@ export class IngestionController {
     private retention: DataRetentionService,
     private osmAdapter: OSMAdapter,
     private wikidataAdapter: WikidataAdapter,
+    private firecrawlTicket: FirecrawlTicketAdapter,
   ) {}
 
   /**
@@ -38,6 +41,8 @@ export class IngestionController {
     let adapter;
     if (source === "osm") {
       adapter = this.osmAdapter;
+    } else if (source === "ticket") {
+      adapter = this.firecrawlTicket;
     } else if (source === "wikidata") {
       adapter = this.wikidataAdapter;
     } else {
@@ -56,6 +61,16 @@ export class IngestionController {
         error: error instanceof Error ? error.message : String(error),
       };
     }
+  }
+
+  /** Costs Firecrawl credits but never writes to the Momap database. */
+  @Post("ticket/preview")
+  async previewTicketCandidates(){
+    if(process.env.MOMAP_TICKET_SCRAPE_ENABLED!=='true')
+      throw new BadRequestException('Ticket collection disabled');
+    assertSourceApproved('firecrawl_ticket');
+    const events=await this.firecrawlTicket.fetchData();
+    return {total:events.length,events:events.slice(0,50),truncated:events.length>50};
   }
 
   /** Read-only preview; requires the existing operator guard. */

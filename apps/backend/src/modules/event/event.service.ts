@@ -31,6 +31,7 @@ export class EventService {
       .addSelect("event.startTime AT TIME ZONE 'Europe/Budapest'", 'event_startTime')
       .addSelect("event.endTime AT TIME ZONE 'Europe/Budapest'", 'event_endTime')
       .where("event.status = :status", { status: "active" })
+      .andWhere("COALESCE(event.endTime,event.startTime) >= (NOW() AT TIME ZONE 'Europe/Budapest')")
       .andWhere(
         `ST_Intersects(event.location, ST_MakeEnvelope(:minLon, :minLat, :maxLon, :maxLat, 4326))`,
         {
@@ -79,12 +80,13 @@ export class EventService {
    * Get all active events.
    */
   async getAllEvents(limit = 100, offset = 0): Promise<Event[]> {
-    return this.eventRepo.find({
-      where: { status: "active" },
-      order: { startTime: "ASC" },
-      take: limit,
-      skip: offset,
-    });
+    return this.eventRepo.createQueryBuilder('event')
+      .where('event.status = :status', {status:'active'})
+      .andWhere("COALESCE(event.endTime,event.startTime) >= (NOW() AT TIME ZONE 'Europe/Budapest')")
+      .orderBy('event.startTime','ASC')
+      .take(Math.min(Math.max(limit,1),100))
+      .skip(Math.max(offset,0))
+      .getMany();
   }
 
   /**
@@ -126,6 +128,10 @@ export class EventService {
    * Get event by ID.
    */
   async getEventById(id: string): Promise<Event | null> {
-    return this.eventRepo.findOne({ where: { id } });
+    return this.eventRepo.createQueryBuilder('event')
+      .where('event.id = :id',{id})
+      .andWhere('event.status = :status',{status:'active'})
+      .andWhere("COALESCE(event.endTime,event.startTime) >= (NOW() AT TIME ZONE 'Europe/Budapest')")
+      .getOne();
   }
 }

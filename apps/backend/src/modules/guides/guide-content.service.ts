@@ -29,8 +29,8 @@ export class GuideContentService {
      FROM momap_guide_pois gp
      JOIN momap_guides g ON g.id=gp.guide_id AND g.published=true
      JOIN pois p ON p.id=gp.poi_id
-     WHERE gp.guide_id=$1 AND p.source IN ('osm','wikidata','lechner')
-       AND p.location IS NOT NULL AND p.attribution IS NOT NULL
+     WHERE gp.guide_id=$1 AND p.source IN ('osm','osm_overpass','wikidata','lechner')
+       AND p.location IS NOT NULL AND p.attribution IS NOT NULL AND p.\"moderationStatus\"='active'
      ORDER BY gp.sort_order,gp.poi_id LIMIT 250`,[guideId]);
   const events:Array<{id:string;title:string;description:string|null;category:string;lng:number;lat:number;attribution:string|null;start_time:string}>=await this.db.query(
    `SELECT e.id,e.title,e.description,e.category,
@@ -40,8 +40,8 @@ export class GuideContentService {
      JOIN momap_guides g ON g.id=ge.guide_id AND g.published=true
      JOIN events e ON e.id=ge.event_id
      WHERE ge.guide_id=$1 AND e.status='active' AND e."isTestData"=false
-       AND e.location IS NOT NULL AND e."startTime">=now()-interval '1 day'
-       AND e."licenseType" IN ('cc0','cc-by','ogl') AND e.attribution IS NOT NULL
+       AND e.location IS NOT NULL AND COALESCE(e."endTime",e."startTime") >= (NOW() AT TIME ZONE 'Europe/Budapest')
+       AND e."licenseType" IN ('cc0','cc-by','cc-by-4.0','ogl') AND e.attribution IS NOT NULL
      ORDER BY ge.sort_order,ge.event_id LIMIT 250`,[guideId]);
   const places:GuidePlace[]=[
    ...pois.map(p=>({id:p.id,kind:"poi" as const,title:p.title,description:p.description,

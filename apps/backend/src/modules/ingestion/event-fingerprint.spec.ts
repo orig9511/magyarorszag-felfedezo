@@ -11,6 +11,9 @@ describe('cross-source event fingerprint',()=>{
   expect(eventFingerprint(base)).not.toBe(eventFingerprint({...base,startTime:new Date('2026-11-09T18:00:00Z')}));
   expect(eventFingerprint(base)).not.toBe(eventFingerprint({...base,venue:'Másik helyszín'}));
  });
+ it('does not merge separate showtimes on the same calendar day',()=>{
+  expect(eventFingerprint(base)).not.toBe(eventFingerprint({...base,startTime:new Date('2026-11-08T20:00:00Z')}));
+ });
  it('refuses to infer duplicates from settlement alone',()=>{
   expect(eventFingerprint({...base,venue:undefined})).toBeNull();
  });

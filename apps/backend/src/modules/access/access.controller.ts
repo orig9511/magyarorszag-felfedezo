@@ -15,6 +15,16 @@ export class AccessController {
  organizations(@Req() req:AuthenticatedRequest) {return this.access.myOrganizations(req.identity!);}
  @Get("guides") @UseGuards(AccessGuard)
  guides(@Req() req:AuthenticatedRequest) {return this.access.myGuides(req.identity!);}
+ @Get("admin/review") @UseGuards(AccessGuard)
+ review(@Req() req:AuthenticatedRequest) {return this.access.dataReviewQueue(req.identity!);}
+ @Post("admin/events/:id/approve") @UseGuards(AccessGuard)
+ approveEvent(@Req() req:AuthenticatedRequest,@Param("id") id:string) {return this.access.reviewEvent(req.identity!,id,'approve');}
+ @Post("admin/events/:id/reject") @UseGuards(AccessGuard)
+ rejectEvent(@Req() req:AuthenticatedRequest,@Param("id") id:string) {return this.access.reviewEvent(req.identity!,id,'reject');}
+ @Post("admin/pois/:id/quarantine") @UseGuards(AccessGuard)
+ quarantinePoi(@Req() req:AuthenticatedRequest,@Param("id") id:string) {return this.access.reviewPoi(req.identity!,id,'quarantine');}
+ @Post("admin/pois/:id/restore") @UseGuards(AccessGuard)
+ restorePoi(@Req() req:AuthenticatedRequest,@Param("id") id:string) {return this.access.reviewPoi(req.identity!,id,'restore');}
  @Get("admin/pending") @UseGuards(AccessGuard)
  pending(@Req() req:AuthenticatedRequest) {return this.access.pending(req.identity!);}
  @Post("admin/:id/approve") @UseGuards(AccessGuard)
