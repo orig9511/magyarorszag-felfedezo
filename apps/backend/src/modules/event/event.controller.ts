@@ -120,6 +120,20 @@ export class EventController {
     return this.eventService.updateEvent(id, updateData);
   }
 
+  /** Quarantine an event for manual review; excluded from active map queries. */
+  @Patch(":id/quarantine")
+  @UseGuards(AdminTokenGuard)
+  async quarantine(@Param("id") id:string) {
+    return this.eventService.quarantineEvent(id);
+  }
+
+  /** Restore a reviewed event to public listings. */
+  @Patch(":id/restore")
+  @UseGuards(AdminTokenGuard)
+  async restore(@Param("id") id:string) {
+    return this.eventService.restoreEvent(id);
+  }
+
   /**
    * Cancel an event.
    * PATCH /api/events/:id/cancel

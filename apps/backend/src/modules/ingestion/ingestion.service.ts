@@ -1,5 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { assertSourceApproved } from "./source-policy";
+import { eventFingerprint } from "./event-fingerprint";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, In } from "typeorm";
 import {
@@ -161,6 +162,34 @@ export class IngestionService {
     const existing = await this.eventRepo.findOne({
       where: { source: sourceAdapter, sourceId: record.externalId },
     });
+
+    // Detect cross-source duplicates before creating a new public event.
+    // A same-source external ID is still authoritative for updates.
+    if (!existing) {
+      const fingerprint = eventFingerprint(record);
+      if (!fingerprint) {
+        throw new Error('Event requires a verifiable title, start date and venue/settlement for deduplication');
+      }
+      const start = new Date(record.startTime.getTime() - 86400000);
+      const end = new Date(record.startTime.getTime() + 86400000);
+      const candidates = await this.eventRepo.createQueryBuilder('event')
+        .where('event.countyId = :countyId', {countyId})
+        .andWhere('event.startTime BETWEEN :start AND :end', {start,end})
+        .andWhere('event.status != :cancelled', {cancelled:'cancelled'})
+        .take(500).getMany();
+      const duplicate = candidates.find(candidate => {
+        try {
+          return eventFingerprint({
+            title:candidate.title,startTime:candidate.startTime,
+            venue:candidate.venue,settlement:candidate.settlement,
+          })===fingerprint;
+        } catch { return false; }
+      });
+      if(duplicate) {
+        this.logger.warn('Cross-source event duplicate suppressed: '+sourceAdapter+'/'+record.externalId+' matches '+duplicate.id);
+        return {created:false,updated:false};
+      }
+    }
 
     const eventData = {
       title: record.title,
