@@ -21,7 +21,10 @@ import { environmentFiles, requireDatabaseUrl } from "./environment.config";
         type: "postgres",
         url: requireDatabaseUrl(configService.get("DATABASE_URL")),
         entities: [__dirname + "/**/*.entity{.ts,.js}"],
-        synchronize: process.env.NODE_ENV === "development",
+        // Never mutate the database schema as a side effect of application startup.
+        // Apply reviewed SQL/TypeORM migrations in an explicit, backed-up operation.
+        synchronize: false,
+        migrationsRun: false,
         logging: process.env.NODE_ENV === "development",
       }),
       inject: [ConfigService],

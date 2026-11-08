@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { ScheduleModule } from "@nestjs/schedule";
 import { IngestionService } from "./ingestion.service";
+import { AdminAuthModule } from "../auth/admin-auth.module";
 import { IngestionController } from "./ingestion.controller";
 import { IngestionJob } from "./entities/ingestion-job.entity";
 import { Event } from "../event/event.entity";
@@ -17,6 +18,7 @@ import { SettlementModule } from "../settlement/settlement.module";
     TypeOrmModule.forFeature([IngestionJob, Event, POI, County]),
     ScheduleModule.forRoot(),
     SettlementModule,
+    AdminAuthModule,
   ],
   providers: [
     IngestionService,

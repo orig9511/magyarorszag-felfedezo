@@ -6,11 +6,14 @@ import {
   Body,
   Query,
   BadRequestException,
+  UseGuards,
 } from "@nestjs/common";
 import { IngestionService } from "./ingestion.service";
+import { AdminTokenGuard } from '../auth/admin-token.guard';
 import { OSMAdapter } from "./adapters/osm.adapter";
 import { WikidataAdapter } from "./adapters/wikidata.adapter";
 
+@UseGuards(AdminTokenGuard)
 @Controller("api/ingestion")
 export class IngestionController {
   constructor(

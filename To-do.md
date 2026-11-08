@@ -1,3 +1,18 @@
+# MOMAP – FOUNDATION-001 checkpoint (2026-11-08)
+
+- [x] Külön `feature/momap-foundation-001` ág létrehozva a `feature/initial-implementation` alapján.
+- [x] Operator-token guard az admin, ingestion és event módosító végpontokra.
+- [x] TypeORM auto-synchronize és auto-migrate indításkor kikapcsolva.
+- [x] CORS origin konfiguráció különválasztva a localhost fejlesztői alapértelmezéstől.
+- [x] Foundation regressziós tesztek hozzáadva.
+- [ ] Backend build + tesztek valódi workspace-ben (UNVERIFIED).
+- [ ] HTTP/DB integráció, ellenőrzött migráció és browser UX (UNVERIFIED).
+- [ ] Momap Maps tenant/RBAC és konfigurálható vendégtérkép.
+
+Részletek: `docs/outputs/MOMAP-FOUNDATION-001.md`, `OUTPUT.md`. A motor marad MapLibre, a tile-szolgáltató váltása későbbi feladat.
+
+---
+
 # MOMAP — Development Roadmap & Project Memory
 
 **Project:** Magyarországi térképes felfedező- és turisztikai platform  

@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Patch, Param, Body, Query } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Param, Body, Query, UseGuards } from '@nestjs/common';
+import { AdminTokenGuard } from '../auth/admin-token.guard';
 import { IngestionService } from "../ingestion/ingestion.service";
 import { EventService } from "../event/event.service";
 import { IngestionJob } from "../ingestion/entities/ingestion-job.entity";
@@ -6,8 +7,9 @@ import { Event } from "../event/event.entity";
 
 /**
  * Admin API: Ingestion monitoring and event moderation
- * Protected by authentication/authorization (TODO: implement)
+ * Protected by interim operator-token guard; per-user RBAC remains a later milestone.
  */
+@UseGuards(AdminTokenGuard)
 @Controller("api/admin")
 export class AdminController {
   constructor(

@@ -25,3 +25,31 @@ export function requireDatabaseUrl(value: unknown): string {
   }
   return value;
 }
+
+/**
+ * Explicit browser origins. Production defaults to no cross-origin browser access.
+ * CORS is not authentication; protected endpoints always require the admin guard.
+ */
+export function allowedCorsOrigins(raw: string | undefined, environment: string | undefined): string[] {
+  if (!raw || !raw.trim()) {
+    return environment === "production"
+      ? []
+      : ["http://localhost:4200", "http://localhost:4201", "http://localhost:3000"];
+  }
+  const values = raw.split(",").map((value) => value.trim());
+  if (values.some((value) => !value)) {
+    throw new Error("CORS_ORIGINS must contain comma-separated HTTP(S) origins.");
+  }
+  for (const value of values) {
+    let parsed: URL;
+    try {
+      parsed = new URL(value);
+    } catch {
+      throw new Error("CORS_ORIGINS must contain valid HTTP(S) origins.");
+    }
+    if (!["http:", "https:"].includes(parsed.protocol) || parsed.origin !== value) {
+      throw new Error("CORS_ORIGINS must contain HTTP(S) origins without paths.");
+    }
+  }
+  return [...new Set(values)];
+}

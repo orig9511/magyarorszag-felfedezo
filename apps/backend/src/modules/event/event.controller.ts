@@ -7,8 +7,10 @@ import {
   Body,
   Query,
   BadRequestException,
+  UseGuards,
 } from "@nestjs/common";
 import { eventDateRange } from "./event-date-range";
+import { AdminTokenGuard } from '../auth/admin-token.guard';
 import { EventService } from "./event.service";
 import { GetEventsDto } from "./dto/get-events.dto";
 import { CreateEventDto } from "./dto/create-event.dto";
@@ -91,6 +93,7 @@ export class EventController {
    * POST /api/events
    */
   @Post()
+  @UseGuards(AdminTokenGuard)
   async create(@Body() data: CreateEventDto) {
     const eventData = {
       ...data,
@@ -105,6 +108,7 @@ export class EventController {
    * PATCH /api/events/:id
    */
   @Patch(":id")
+  @UseGuards(AdminTokenGuard)
   async update(@Param("id") id: string, @Body() data: Partial<CreateEventDto>) {
     const updateData = {
       ...data,
@@ -119,6 +123,7 @@ export class EventController {
    * PATCH /api/events/:id/cancel
    */
   @Patch(":id/cancel")
+  @UseGuards(AdminTokenGuard)
   async cancel(@Param("id") id: string) {
     return this.eventService.cancelEvent(id);
   }
