@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { AccessSessionService } from './access-session.service';
 type Vertical = 'hotel' | 'restaurant' | 'service';
 interface Identity { id:string;email:string;role:'admin'|'partner';status:string; }
 interface Organization {id:string;name:string;slug:string;businessType:Vertical;role:string;}
@@ -49,9 +50,9 @@ interface Pending {id:string;email:string;name:string;businessType:Vertical;crea
      <div class="section-head"><h2>Saját vállalkozások</h2><button class="ghost" (click)="refresh()">Frissítés</button></div>
      <div class="item" *ngFor="let o of organizations"><div><strong>{{o.name}}</strong><p>{{o.slug}} · {{typeLabel(o.businessType)}} · {{o.role}}</p></div><span class="pill">Aktív hozzáférés</span></div>
      <div class="empty" *ngIf="!organizations.length">Ehhez a munkaterülethez nincs hozzárendelt vállalkozás.</div>
-     <div class="section-head"><h2>Vendégtérképek</h2><span class="muted">Jelenleg csak olvasható</span></div>
-     <div class="item" *ngFor="let g of guides"><div><strong>{{g.title}}</strong><p>{{g.organization}} · {{g.slug}}</p></div><a *ngIf="g.published" [routerLink]="['/g',g.slug]">Térkép megnyitása</a><span *ngIf="!g.published" class="pill">Piszkozat</span></div>
-     <div class="empty" *ngIf="!guides.length">Még nincs vendégtérkép. A szerkesztő a következő kiadásban érkezik.</div>
+     <div class="section-head"><h2>Vendégtérképek</h2><a [routerLink]="['/access',vertical,'guides','new']">+ Új vendégtérkép</a></div>
+     <div class="item" *ngFor="let g of guides"><div><strong>{{g.title}}</strong><p>{{g.organization}} · {{g.slug}}</p></div><a *ngIf="g.published" [routerLink]="['/g',g.slug]">Térkép megnyitása</a><a *ngIf="!g.published" [routerLink]="['/access',vertical,'guides',g.id]">Szerkesztés</a></div>
+     <div class="empty" *ngIf="!guides.length">Még nincs vendégtérkép. Hozz létre egy új piszkozatot.</div>
     </ng-container>
    </ng-container>
   </main>
@@ -83,19 +84,17 @@ interface Pending {id:string;email:string;name:string;businessType:Vertical;crea
 export class AccessComponent implements OnInit {
  vertical:'admin'|Vertical='hotel';mode:'login'|'register'='login';
  identity?:Identity;organizations:Organization[]=[];guides:Guide[]=[];pending:Pending[]=[];
- error='';notice='';busy=false;token='';
+ error='';notice='';busy=false;
+ get token(){return this.session.token;}
  form={email:'',password:'',name:'',slug:''};
- constructor(private route:ActivatedRoute,private router:Router){}
+ constructor(private route:ActivatedRoute,private router:Router,private session:AccessSessionService){}
  get heading(){return {admin:'Platform adminisztráció',hotel:'Szálláshelyek kezelése',restaurant:'Éttermek kezelése',service:'Szolgáltatói központ'}[this.vertical];}
  get subheading(){return {admin:'Partnerkérelmek és platformfelügyelet',hotel:'Vendégélmények és saját térképek egy helyen',restaurant:'Helyi jelenlét és éttermi információk',service:'Szolgáltatások és helyi ajánlatok kezelése'}[this.vertical];}
  get publishedCount(){return this.guides.filter(g=>g.published).length;}
  typeLabel(t:Vertical){return {hotel:'Szálláshely',restaurant:'Étterem',service:'Szolgáltató'}[t]||t;}
- ngOnInit(){this.route.paramMap.subscribe(params=>{const v=params.get('vertical');this.vertical=v==='admin'||v==='restaurant'||v==='service'?v:'hotel';this.identity=undefined;this.token='';this.error='';this.notice='';this.mode='login';});}
+ ngOnInit(){this.route.paramMap.subscribe(params=>{const v=params.get('vertical');this.vertical=v==='admin'||v==='restaurant'||v==='service'?v:'hotel';this.identity=this.session.identity;this.error='';this.notice='';this.mode='login';});}
  async request(path:string,method='GET',body?:unknown):Promise<any>{
-  const res=await fetch('/api/access/'+path,{method,headers:{'Content-Type':'application/json',...(this.token?{Authorization:'Bearer '+this.token}:{})},...(body===undefined?{}:{body:JSON.stringify(body)})});
-  const data=await res.json().catch(()=>({}));
-  if(!res.ok)throw new Error(typeof data.message==='string'?data.message:'A művelet nem sikerült.');
-  return data;
+  return this.session.request('/api/access/'+path,method,body);
  }
  async submit(){
   this.error='';this.notice='';this.busy=true;
@@ -107,7 +106,7 @@ export class AccessComponent implements OnInit {
    }
    const result=await this.request('login','POST',{email:this.form.email,password:this.form.password});
    this.form.password='';
-   this.token=result.token;this.identity=result.identity;
+   this.session.setSession(result.token,result.identity);this.identity=result.identity;
    if((this.vertical==='admin')!==(this.identity?.role==='admin')){this.logout();this.error='Ehhez a munkaterülethez nincs jogosultságod.';return;}
    await this.refresh();
   }catch(e){this.error=e instanceof Error?e.message:'Hiba történt.';}finally{this.busy=false;}
@@ -128,6 +127,6 @@ export class AccessComponent implements OnInit {
  }
  async logout(){
   try{if(this.token)await this.request('logout','POST');}catch{}
-  this.identity=undefined;this.token='';this.organizations=[];this.guides=[];this.pending=[];
+  this.identity=undefined;this.session.clear();this.organizations=[];this.guides=[];this.pending=[];
  }
 }
