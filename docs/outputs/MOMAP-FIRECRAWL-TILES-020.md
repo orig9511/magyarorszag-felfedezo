@@ -18,7 +18,8 @@ No tile prefetching or bulk download was performed. Retain OpenStreetMap/OpenMap
 - Discovery-only registry: Jegy.hu, Cooltix and Eventim; **all unapproved**, with no seed URLs. Public listings are not a republication licence.
 - Dual policy gates: `SOURCE_POLICIES.firecrawl_ticket.approved` AND each `TICKET_SOURCES[id].approved`, plus documented source-specific licence and review date. Discovery needs another independently reviewed scope.
 - Protected entrypoint `POST /api/ingestion/run?source=ticket`; existing operator guard applies, and global ingestion enablement must also be true.
-- Optional approved-domain discovery via Firecrawl `POST /v2/map`, filtering URL hostname, HTTPS and permitted event-detail paths; **at most 20 page scrapes per invocation** with 750ms pacing and a 20s timeout per request.
+- Protected **no-DB-write preview**: `POST /api/ingestion/ticket/preview` (up to 50 candidates), still requires source approval and charges Firecrawl credits.
+- Optional approved-domain discovery via Firecrawl `POST /v2/map`, filtering URL hostname, HTTPS and permitted event-detail paths, including final response/redirect URL validation; **at most 20 page scrapes per invocation** with 750ms pacing and a 20s timeout per request.
 - Details fetched with Firecrawl `POST /v2/scrape`; HTML parsed for schema.org JSON-LD Event and event subtypes. Strict event/title/venue/locality/timezone validation; event geo extracted where present.
 - Tracking parameters stripped, stable per-occurrence source IDs, existing cross-source dedupe improved to distinguish same-day separate showtimes.
 - Candidates saved as `draft`; admin-only review requires geographic coordinates and a future date before publishing. Re-ingestion preserves existing moderation status.
