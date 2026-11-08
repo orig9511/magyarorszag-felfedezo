@@ -207,7 +207,8 @@ export class IngestionService {
       licenseType: record.licenseType,
       attribution: record.attribution,
       retrievedAt: new Date(),
-      status: "active",
+      // Ticket-page data is always moderated before publication.
+      status: sourceAdapter === 'firecrawl_ticket' ? 'draft' : 'active',
       location: record.latitude !== undefined && record.longitude !== undefined
         ? {type:'Point' as const, coordinates:[record.longitude,record.latitude]}
         : null,
