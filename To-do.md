@@ -1,3 +1,16 @@
+# MOMAP – MAPS-001 checkpoint (2026-11-08)
+
+- [x] Partner guide domain contract and validation added (source-level implementation).
+- [x] Safe public guide projection and regression tests authored.
+- [ ] TypeScript build + Node regression tests (UNVERIFIED).
+- [ ] Partner auth, tenant isolation and migration design.
+- [ ] Public guide read API and Angular MapLibre guest route.
+- [ ] Real DB migrations and deployment: NOT AUTHORIZED, NOT EXECUTED.
+
+See `docs/outputs/MOMAP-MAPS-001.md`. MapLibre stays; tile-provider selection is postponed.
+
+---
+
 # MOMAP – FOUNDATION-001 checkpoint (2026-11-08)
 
 - [x] Külön `feature/momap-foundation-001` ág létrehozva a `feature/initial-implementation` alapján.

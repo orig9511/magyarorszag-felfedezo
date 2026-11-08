@@ -1,23 +1,17 @@
-# MOMAP – FOUNDATION-001
+# MOMAP – MAPS-001
 
-Dátum: 2026-11-08. Branch: `feature/momap-foundation-001`.
+Branch: `feature/momap-foundation-001` • 2026-11-08
 
-**Státusz: IMPLEMENTED / UNVERIFIED BUILD & RUNTIME.** A GitHub forráskód módosítva; nincs lokálisan futtatott Nest build, teszt, adatbázis, deploy vagy böngésző.
+**Status:** PARTIAL – Guide configuration domain contract and tests added, no live partner API or DB changes.
 
-## Változások
-- `AdminTokenGuard` és `AdminAuthModule`: csak legalább 32 karakteres `MOMAP_ADMIN_TOKEN` esetén engedélyezett operator hozzáférés, Bearer fejléc és timing-safe hash összevetés.
-- Védett teljes `api/admin`, `api/ingestion`, valamint `api/events` író végpontok.
-- Explicit TypeORM `synchronize:false`, `migrationsRun:false`.
-- Konfigurálható `CORS_ORIGINS` (production alapértelmezésben deny), meglévő lokális origin fallback megőrzése.
-- Új regressziós tesztek: `apps/backend/tests/foundation-security.test.cjs`.
+## Implemented
+- Storage-independent, strict validated guide configuration with slug, organization reference, brand, map view, categories and explicit POI/event allowlists.
+- Public projection excludes organization ID and rejects unpublished guides.
+- Node test cases cover invalid slugs, IDs, URLs, coordinates, duplicate IDs, draft privacy and immutable projection.
+- Full technical details: `docs/outputs/MOMAP-MAPS-001.md`.
 
-## Nem változott
-MapLibre, tile-provider, frontend/POI/event olvasás, ingestion scheduler, DB-tartalom/migrációk, production deployment és eredeti `feature/initial-implementation` ág.
+## Not executed / unchanged
+Build and tests UNVERIFIED in GitHub-only workspace. MapLibre, tile provider, Angular, database schema/data and deployment unchanged.
 
-## Ellenőrzés
-- **VERIFIED:** GitHub forrásfájlok és branch rendelkezésre állnak, a változás külön fejlesztési ágra korlátozott.
-- **UNVERIFIED:** NestJS build, regressziós tesztek, élő HTTP, helyi PostgreSQL és valós production.
-- **BLOCKED:** A GitHub-kapcsolat nem biztosít futtatható workspace-t; automatikusan nem telepítettünk csomagokat.
-
-Részletek és validációs parancsok: `docs/outputs/MOMAP-FOUNDATION-001.md`.
-Korábbi feladat eredménye: `docs/outputs/MAP-BACKEND-001.md`.
+## Next
+Build/test, then design reviewed migrations and tenant-aware API with explicit authorization.
