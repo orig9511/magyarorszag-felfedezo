@@ -15,6 +15,7 @@ export function eventFingerprint(record:Pick<RawEventData,'title'|'startTime'|'v
  // Settlement alone is too broad: different events can share title/day/city.
  const place=normalizeEventText(record.venue);
  if(title.length<5||place.length<3)return null;
- const canonical=[title,eventLocalDay(record.startTime),place].join('|');
+ const clock=new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Budapest',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(record.startTime);
+ const canonical=[title,eventLocalDay(record.startTime),clock,place].join('|');
  return createHash('sha256').update(canonical).digest('hex');
 }
