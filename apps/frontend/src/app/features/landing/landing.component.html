@@ -119,6 +119,9 @@
     </div>
   </section>
 
+  <!-- Ad inventory: intentionally hidden until consent and AdSense activation -->
+  <div class="wrap"><app-ad-slot placement="after-categories" /></div>
+
   <!-- INSPIRATION -->
   <section id="kiemelt" class="section featured" aria-labelledby="featured-title" tabindex="-1">
     <div class="wrap">
@@ -158,6 +161,8 @@
       </div>
     </div>
   </section>
+
+  <div class="wrap"><app-ad-slot placement="after-featured" /></div>
 
   <!-- HOW IT WORKS -->
   <section id="hogyan" class="section how" aria-labelledby="how-title" tabindex="-1">
@@ -227,6 +232,7 @@
       <a class="btn btn-primary btn-lg" routerLink="/explore">Térkép megnyitása <lucide-icon [img]="icons.ArrowRight" [size]="18" [strokeWidth]="2"></lucide-icon></a>
     </div>
   </section>
+  <div class="wrap"><app-ad-slot placement="before-footer" /></div>
 </main>
 
 <footer class="site-footer">
