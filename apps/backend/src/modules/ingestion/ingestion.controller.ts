@@ -28,6 +28,7 @@ export class IngestionController {
    */
   @Post("run")
   async runIngestion(@Query("source") source: string) {
+    if (process.env.MOMAP_INGESTION_ENABLED !== 'true') { throw new BadRequestException('Ingestion disabled pending source compliance review'); }
     if (!source) {
       throw new BadRequestException("source parameter is required");
     }
