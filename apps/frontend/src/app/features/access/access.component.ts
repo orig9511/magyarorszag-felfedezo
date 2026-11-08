@@ -3,6 +3,7 @@ import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AccessSessionService } from './access-session.service';
+import { GuideQrComponent } from '../../shared/guide-qr/guide-qr.component';
 type Vertical = 'hotel' | 'restaurant' | 'service';
 interface Identity { id:string;email:string;role:'admin'|'partner';status:string; }
 interface Organization {id:string;name:string;slug:string;businessType:Vertical;role:string;}
@@ -10,7 +11,7 @@ interface Guide {id:string;slug:string;title:string;published:boolean;organizati
 interface ModeratedGuide {id:string;slug:string;title:string;published:boolean;organization:string;businessType:string;poiCount:number;eventCount:number;}
 interface Pending {id:string;email:string;name:string;businessType:Vertical;createdAt:string;}
 @Component({
- selector:'app-access',standalone:true,imports:[CommonModule,FormsModule,RouterLink],
+ selector:'app-access',standalone:true,imports:[CommonModule,FormsModule,RouterLink,GuideQrComponent],
  template:`
  <div class="shell">
   <aside class="sidebar">
@@ -61,7 +62,8 @@ interface Pending {id:string;email:string;name:string;businessType:Vertical;crea
      <div class="item" *ngFor="let o of organizations"><div><strong>{{o.name}}</strong><p>{{o.slug}} · {{typeLabel(o.businessType)}} · {{o.role}}</p></div><span class="pill">Aktív hozzáférés</span></div>
      <div class="empty" *ngIf="!organizations.length">Ehhez a munkaterülethez nincs hozzárendelt vállalkozás.</div>
      <div class="section-head"><h2>Vendégtérképek</h2><a [routerLink]="['/access',vertical,'guides','new']">+ Új vendégtérkép</a></div>
-     <div class="item" *ngFor="let g of guides"><div><strong>{{g.title}}</strong><p>{{g.organization}} · {{g.slug}}</p></div><div class="guide-actions" *ngIf="g.published"><a [routerLink]="['/g',g.slug]">Térkép megnyitása</a><button type="button" class="ghost" (click)="copyGuideLink(g)">Link másolása</button><button type="button" class="ghost" (click)="shareGuide(g)">Megosztás</button></div><a *ngIf="!g.published" [routerLink]="['/access',vertical,'guides',g.id]">Szerkesztés</a></div>
+     <div class="item" *ngFor="let g of guides"><div><strong>{{g.title}}</strong><p>{{g.organization}} · {{g.slug}}</p></div><div class="guide-actions" *ngIf="g.published"><a [routerLink]="['/g',g.slug]">Térkép megnyitása</a><button type="button" class="ghost" (click)="copyGuideLink(g)">Link másolása</button><button type="button" class="ghost" (click)="shareGuide(g)">Megosztás</button><button type="button" class="ghost" (click)="qrGuide=g">QR-kód</button></div><a *ngIf="!g.published" [routerLink]="['/access',vertical,'guides',g.id]">Szerkesztés</a></div>
+     <section *ngIf="qrGuide" class="qr-preview"><button type="button" class="ghost" (click)="qrGuide=null">Bezárás</button><app-guide-qr [url]="guestUrl(qrGuide)" [filename]="qrGuide.slug" /></section>
      <div class="empty" *ngIf="!guides.length">Még nincs vendégtérkép. Hozz létre egy új piszkozatot.</div>
     </ng-container>
    </ng-container>
@@ -137,7 +139,8 @@ export class AccessComponent implements OnInit {
   try{await this.request('admin/'+id+'/'+(approve?'approve':'reject'),'POST');this.notice=approve?'Partner jóváhagyva.':'Kérelem elutasítva.';await this.refresh();}
   catch(e){this.error=e instanceof Error?e.message:'Hiba történt.';}
  }
- private guestUrl(guide:Guide):string {
+ qrGuide:Guide|null=null;
+ guestUrl(guide:Guide):string {
   return new URL('/g/'+encodeURIComponent(guide.slug),window.location.origin).href;
  }
  async copyGuideLink(guide:Guide){
