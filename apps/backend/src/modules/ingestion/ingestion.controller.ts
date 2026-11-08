@@ -13,6 +13,7 @@ import { DataRetentionService } from "./data-retention.service";
 import { AdminTokenGuard } from '../auth/admin-token.guard';
 import { OSMAdapter } from "./adapters/osm.adapter";
 import { WikidataAdapter } from "./adapters/wikidata.adapter";
+import { FirecrawlTicketAdapter } from "./adapters/firecrawl-ticket.adapter";
 
 @UseGuards(AdminTokenGuard)
 @Controller("api/ingestion")
@@ -22,6 +23,7 @@ export class IngestionController {
     private retention: DataRetentionService,
     private osmAdapter: OSMAdapter,
     private wikidataAdapter: WikidataAdapter,
+    private firecrawlTicket: FirecrawlTicketAdapter,
   ) {}
 
   /**
@@ -38,6 +40,8 @@ export class IngestionController {
     let adapter;
     if (source === "osm") {
       adapter = this.osmAdapter;
+    } else if (source === "ticket") {
+      adapter = this.firecrawlTicket;
     } else if (source === "wikidata") {
       adapter = this.wikidataAdapter;
     } else {
