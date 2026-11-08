@@ -1,5 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { DataAdapter, RawPOIData } from "../interfaces/data-adapter.interface";
+import { selectedIngestionRegion, withinRegion } from "../region-config";
+import { normalizeOsmCategory } from "../poi-taxonomy";
 
 /**
  * OSM POI adapter using Overpass API.
@@ -77,7 +79,7 @@ export class OSMAdapter implements DataAdapter {
   private buildOverpassQuery(): string {
     // Query for Debrecen area (simplified bounds)
     // TODO: Make this configurable per region
-    const bbox = "47.5,21.6,47.55,21.7"; // rough Debrecen area
+    const bbox = selectedIngestionRegion().bbox.join(",");
 
     return `
 [out:json][timeout:55];
@@ -101,6 +103,7 @@ out center;
     const elements=(payload as {elements:unknown[]}).elements;
     const results:RawPOIData[]=[];
     const seen=new Set<string>();
+    const region=selectedIngestionRegion();
     for(const item of elements) {
       if(!item || typeof item!=='object')continue;
       const el=item as {type?:string;id?:number;lat?:number;lon?:number;
@@ -110,16 +113,16 @@ out center;
       if(seen.has(id))continue;
       const tags=el.tags||{};
       const name=tags['name:hu']||tags.name;
-      const category=tags.tourism||tags.amenity||tags.historic;
+      const category=normalizeOsmCategory(tags);
       const lat=el.type==='node'?el.lat:el.center?.lat;
       const lon=el.type==='node'?el.lon:el.center?.lon;
       if(!name || !category || typeof lat!=='number'||typeof lon!=='number'||
-         !Number.isFinite(lat)||!Number.isFinite(lon)||lat < -90||lat > 90||lon < -180||lon > 180)continue;
+         !withinRegion(lat,lon,region))continue;
       seen.add(id);
       results.push({
         externalId:id,name,category,latitude:lat,longitude:lon,
         // Geographic matching must be reviewed before import is approved.
-        settlement:'Debrecen',
+        settlement:region.settlement,
         description:tags.description,website:tags.website,phone:tags.phone,
         address:[tags['addr:street'],tags['addr:housenumber']].filter(Boolean).join(' ')||undefined,
         sourceUrl:'https://www.openstreetmap.org/'+id,
