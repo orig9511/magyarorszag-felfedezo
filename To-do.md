@@ -1,3 +1,18 @@
+# MOMAP – MAPS-002 checkpoint (2026-11-08)
+
+- [x] Multi-tenant organization/guide schema proposal authored (NOT APPLIED).
+- [x] Ownership, membership roles, publishing state, explicit curated POI/event relations documented.
+- [x] Static SQL structure tests authored (NOT EXECUTED).
+- [ ] Verify real PostgreSQL schema and run build/tests in a workspace.
+- [ ] Review and authorize migration separately after backup/restore test.
+- [ ] Implement verified identity + organization-scoped API.
+- [ ] Public published-guide endpoint and Angular guest map.
+- [ ] Tile provider switch later; MapLibre remains.
+
+Details: `docs/outputs/MOMAP-MAPS-002.md`.
+
+---
+
 # MOMAP – MAPS-001 checkpoint (2026-11-08)
 
 - [x] Partner guide domain contract and validation added (source-level implementation).

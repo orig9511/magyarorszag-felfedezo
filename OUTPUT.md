@@ -1,17 +1,10 @@
-# MOMAP – MAPS-001
+# MOMAP – MAPS-002
 
-Branch: `feature/momap-foundation-001` • 2026-11-08
+**Status: PARTIAL / SQL DESIGN ONLY.** 2026-11-08.
 
-**Status:** PARTIAL – Guide configuration domain contract and tests added, no live partner API or DB changes.
-
-## Implemented
-- Storage-independent, strict validated guide configuration with slug, organization reference, brand, map view, categories and explicit POI/event allowlists.
-- Public projection excludes organization ID and rejects unpublished guides.
-- Node test cases cover invalid slugs, IDs, URLs, coordinates, duplicate IDs, draft privacy and immutable projection.
-- Full technical details: `docs/outputs/MOMAP-MAPS-001.md`.
-
-## Not executed / unchanged
-Build and tests UNVERIFIED in GitHub-only workspace. MapLibre, tile provider, Angular, database schema/data and deployment unchanged.
-
-## Next
-Build/test, then design reviewed migrations and tenant-aware API with explicit authorization.
+- Created `apps/backend/src/migrations/proposals/003_momap_guides.sql`: additive, transactional proposed organizations, memberships, guides and curated guide POI/event relations.
+- Created `apps/backend/tests/guide-schema.test.cjs`: static SQL contract tests (NOT EXECUTED).
+- Detailed migration safety and tenant isolation design: `docs/outputs/MOMAP-MAPS-002.md`.
+- NO database schema/data changes, NO migration execution, NO deployment, NO map engine/tile changes.
+- GitHub source commit verification only. Build and tests UNVERIFIED.
+- Next: read-only DB schema check, test environment, authenticated tenant-aware API, then guest UI.
