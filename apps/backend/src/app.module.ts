@@ -8,6 +8,7 @@ import { SettlementModule } from "./modules/settlement/settlement.module";
 import { IngestionModule } from "./modules/ingestion/ingestion.module";
 import { AdminModule } from "./modules/admin/admin.module";
 import { GuidesModule } from "./modules/guides/guides.module";
+import { AccessModule } from "./modules/access/access.module";
 import { environmentFiles, requireDatabaseUrl } from "./environment.config";
 
 @Module({
@@ -37,6 +38,7 @@ import { environmentFiles, requireDatabaseUrl } from "./environment.config";
     IngestionModule,
     AdminModule,
     GuidesModule,
+    AccessModule,
   ],
 })
 export class AppModule {}
