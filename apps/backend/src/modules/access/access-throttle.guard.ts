@@ -1,4 +1,4 @@
-import { CanActivate, ExecutionContext, Injectable, TooManyRequestsException } from "@nestjs/common";
+import { CanActivate, ExecutionContext, Injectable, HttpException, HttpStatus } from "@nestjs/common";
 import { createHash } from "node:crypto";
 
 /** Single-instance development throttle; use shared Redis/WAF limits before production. */
@@ -14,7 +14,7 @@ export class AccessThrottleGuard implements CanActivate {
   const bucket=existing&&existing.until>now?existing:{count:0,until:now+60_000};
   bucket.count++;this.attempts.set(key,bucket);
   if(this.attempts.size>10000)for(const [id,value] of this.attempts)if(value.until<=now)this.attempts.delete(id);
-  if(bucket.count>8)throw new TooManyRequestsException("Too many authentication attempts");
+  if(bucket.count>8)throw new HttpException("Too many authentication attempts",HttpStatus.TOO_MANY_REQUESTS);
   return true;
  }
 }
