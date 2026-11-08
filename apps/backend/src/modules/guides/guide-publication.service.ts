@@ -29,10 +29,10 @@ export class GuidePublicationService {
    if(publish){
     const links:{poi_count:number;event_count:number}[]=await manager.query(
      `SELECT (SELECT count(*)::integer FROM momap_guide_pois gp JOIN pois p ON p.id=gp.poi_id
-          WHERE gp.guide_id=$1 AND p.source IN ('osm','wikidata','lechner') AND p.attribution IS NOT NULL) AS poi_count,
+          WHERE gp.guide_id=$1 AND p.source IN ('osm','wikidata','lechner') AND p.attribution IS NOT NULL AND btrim(p.attribution) <> '') AS poi_count,
        (SELECT count(*)::integer FROM momap_guide_events ge JOIN events e ON e.id=ge.event_id
           WHERE ge.guide_id=$1 AND e.status='active' AND e."isTestData"=false
-          AND e."licenseType" IN ('cc0','cc-by','ogl')) AS event_count`,[id]);
+          AND e."licenseType" IN ('cc0','cc-by','ogl') AND e.attribution IS NOT NULL) AS event_count`,[id]);
     const all:{poi_count:number;event_count:number}[]=await manager.query(
      `SELECT (SELECT count(*)::integer FROM momap_guide_pois WHERE guide_id=$1) AS poi_count,
       (SELECT count(*)::integer FROM momap_guide_events WHERE guide_id=$1) AS event_count`,[id]);
