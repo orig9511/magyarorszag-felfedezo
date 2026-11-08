@@ -51,8 +51,7 @@ export class OSMAdapter implements DataAdapter {
       return pois;
     } catch (error) {
       this.logger.error(`Overpass fetch failed: ${error}`);
-      // Return empty array on error to allow partial ingestion
-      return [];
+      throw error;
     } finally {
       clearTimeout(timeoutId);
     }

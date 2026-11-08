@@ -53,7 +53,7 @@ export class WikidataAdapter implements DataAdapter {
       return pois;
     } catch (error) {
       this.logger.error(`Wikidata fetch failed: ${error}`);
-      return [];
+      throw error;
     } finally {
       clearTimeout(timeoutId);
     }
