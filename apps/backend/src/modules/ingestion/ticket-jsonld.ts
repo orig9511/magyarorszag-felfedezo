@@ -14,10 +14,17 @@ function isEvent(v:Dict):boolean{
  const type=v['@type'];
  return (Array.isArray(type)?type:[type]).some(t=>typeof t==='string'&&/^(?:https?:\/\/schema.org\/)?(?:[A-Za-z]*Event)$/.test(t));
 }
-function extractVenue(value:unknown):{name?:string;settlement?:string}{
+function extractVenue(value:unknown):{name?:string;settlement?:string;latitude?:number;longitude?:number}{
  if(!obj(value))return {};
  const address=obj(value.address)?value.address:{};
- return {name:str(value.name),settlement:str(address.addressLocality)};
+ const geo=obj(value.geo)?value.geo:{};
+ const lat=typeof geo.latitude==='number'?geo.latitude:typeof geo.latitude==='string'?Number(geo.latitude):NaN;
+ const lon=typeof geo.longitude==='number'?geo.longitude:typeof geo.longitude==='string'?Number(geo.longitude):NaN;
+ return {
+  name:str(value.name),settlement:str(address.addressLocality),
+  latitude:Number.isFinite(lat)&&lat>=-90&&lat<=90?lat:undefined,
+  longitude:Number.isFinite(lon)&&lon>=-180&&lon<=180?lon:undefined,
+ };
 }
 /** Parse only structured schema.org Event data; never infer dates from page prose. */
 export function extractTicketEvents(
@@ -61,6 +68,7 @@ export function extractTicketEvents(
    if(seen.has(stable))continue;
    seen.add(stable);
    out.push({externalId:stable,title,venue:venue.name,settlement:venue.settlement,
+    latitude:venue.latitude,longitude:venue.longitude,
     startTime,endTime,sourceUrl:canonical,officialEventUrl:canonical,
     licenseType:licence,attribution,sourceName,
     status:'draft',
