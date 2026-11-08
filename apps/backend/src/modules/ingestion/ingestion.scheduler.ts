@@ -24,6 +24,7 @@ export class IngestionScheduler {
    */
   @Cron('0 2 * * *')
   async runDailyOSMIngestion() {
+    if (process.env.MOMAP_INGESTION_ENABLED !== 'true') { this.logger.log('OSM ingestion disabled by default'); return; }
     this.logger.log('Starting scheduled OSM ingestion');
     try {
       const result = await this.ingestionService.ingestData(this.osmAdapter);
@@ -39,6 +40,7 @@ export class IngestionScheduler {
    */
   @Cron('0 3 * * 0')
   async runWeeklyWikidataIngestion() {
+    if (process.env.MOMAP_INGESTION_ENABLED !== 'true') { this.logger.log('Wikidata ingestion disabled by default'); return; }
     this.logger.log('Starting scheduled Wikidata ingestion');
     try {
       const result = await this.ingestionService.ingestData(this.wikidataAdapter);
