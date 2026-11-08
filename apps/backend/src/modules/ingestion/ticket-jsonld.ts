@@ -30,7 +30,7 @@ export function extractTicketEvents(
  const seen=new Set<string>();
  for(const match of scripts){
   let data:unknown;
-  try{data=JSON.parse(match[1].replace(/<\\/script/gi,'<\\/script'));}catch{continue;}
+  try{data=JSON.parse(match[1]);}catch{continue;}
   for(const item of nodes(data)){
    if(!isEvent(item))continue;
    const title=str(item.name),date=str(item.startDate);
