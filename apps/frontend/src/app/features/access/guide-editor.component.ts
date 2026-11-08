@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { AccessSessionService } from './access-session.service';
 
 interface GuideForm {
  organizationId:string;slug:string;
@@ -69,21 +70,46 @@ export class GuideEditorComponent implements OnInit {
  {id:'event',label:'Esemény'},{id:'other',label:'Egyéb'}];
  form:GuideForm={organizationId:'',slug:'',branding:{title:'',accentColor:'#67c58c'},
  map:{center:[19.04,47.5],zoom:12},categories:['attraction'],poiIds:[],eventIds:[],published:false};
- constructor(private route:ActivatedRoute,private router:Router){}
+ constructor(private route:ActivatedRoute,private router:Router,private session:AccessSessionService){}
  async ngOnInit(){
   this.vertical=this.route.snapshot.paramMap.get('vertical')||'hotel';
   this.id=this.route.snapshot.paramMap.get('id')||'';
   if(!TYPES.includes(this.vertical)){this.error='Érvénytelen munkaterület';return;}
-  // AccessComponent intentionally keeps sessions in memory. This editor therefore
-  // requires an explicit re-authentication token flow before it can be used.
-  this.error='A szerkesztő felülete elkészült, de a munkamenet átadása még nincs bekötve. A szerkesztés jelenleg le van tiltva.';
+  if(!this.session.token || this.session.identity?.role!=='partner'){
+   this.error='A szerkesztéshez jelentkezz be a partner munkaterületen.';return;
+  }
+  try{
+   const orgs=await this.session.request('/api/access/organizations');
+   this.organizations=(orgs as typeof this.organizations).filter(o=>o.businessType===this.vertical && (o.role==='owner'||o.role==='editor'));
+   if(this.id){
+    const data:GuideForm=await this.session.request('/api/partner/guides/'+encodeURIComponent(this.id));
+    if(!this.organizations.some(o=>o.id===data.organizationId))throw Error('Nincs jogosultság ehhez a munkaterülethez.');
+    this.form=data;
+    this.logo=data.branding.logoUrl||'';
+    this.poiText=data.poiIds.join('\\n');
+    this.eventText=data.eventIds.join('\\n');
+   }else if(this.organizations.length){this.form.organizationId=this.organizations[0].id;}
+   this.ready=true;
+  }catch(e){this.error=e instanceof Error?e.message:'Betöltési hiba';}
  }
  toggleCategory(category:string,event:Event){
   const checked=(event.target as HTMLInputElement).checked;
   this.form.categories=checked?[...this.form.categories,category]:this.form.categories.filter(x=>x!==category);
  }
  async save(){
-  // Deliberately disabled until secure session handoff is implemented.
-  this.error='A mentés még nem engedélyezett ezen a felületen.';
+  this.busy=true;this.error='';this.notice='';
+  try{
+   const parseIds=(raw:string)=>raw.split(/\\r?\\n/).map(x=>x.trim()).filter(Boolean);
+   const body:GuideForm={...this.form,
+    branding:{...this.form.branding,...(this.logo.trim()?{logoUrl:this.logo.trim()}:{})},
+    poiIds:parseIds(this.poiText),eventIds:parseIds(this.eventText),published:false};
+   if(!this.organizations.some(o=>o.id===body.organizationId))throw Error('Nincs jogosultság ehhez a szervezethez.');
+   const result=await this.session.request(
+    '/api/partner/guides'+(this.id?'/'+encodeURIComponent(this.id):''),
+    this.id?'PUT':'POST',body);
+   this.notice='Piszkozat sikeresen mentve.';
+   if(!this.id){this.id=result.id;await this.router.navigate(['/access',this.vertical,'guides',this.id]);}
+  }catch(e){this.error=e instanceof Error?e.message:'A mentés sikertelen.';}
+  finally{this.busy=false;}
  }
 }
