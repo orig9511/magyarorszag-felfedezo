@@ -10,6 +10,12 @@ describe('review-only structured ticket extraction',()=>{
   expect(rows).toHaveLength(1);
   expect(rows[0]).toMatchObject({title:'Őszi Jazz Est',settlement:'Debrecen',venue:'Kölcsey Központ',status:'draft',sourceUrl:'https://tickets.example.test/event/123'});
  });
+ it('reads verified structured venue coordinates',()=>{
+  const record={...event,location:{name:'Kölcsey Központ',address:{addressLocality:'Debrecen'},geo:{latitude:'47.529',longitude:'21.625'}}};
+  const rows=extractTicketEvents(html(record),url,'Test','CC-BY-4.0','Test');
+  expect(rows[0].latitude).toBeCloseTo(47.529);
+  expect(rows[0].longitude).toBeCloseTo(21.625);
+ });
  it('keeps two showtimes distinct',()=>{
   const rows=extractTicketEvents(html([event,{...event,startDate:'2026-11-22T21:30:00+01:00'}]),url,'Test','CC-BY-4.0','Test');
   expect(rows).toHaveLength(2);
