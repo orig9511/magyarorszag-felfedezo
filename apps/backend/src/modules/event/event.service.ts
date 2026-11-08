@@ -113,6 +113,15 @@ export class EventService {
     });
   }
 
+  async quarantineEvent(id:string):Promise<Event> {
+    return this.updateEvent(id,{status:'draft',statusChangedAt:new Date()});
+  }
+  async restoreEvent(id:string):Promise<Event> {
+    const event=await this.eventRepo.findOneOrFail({where:{id}});
+    if(event.status!=='draft')throw new Error('Only quarantined events can be restored');
+    return this.updateEvent(id,{status:'active',statusChangedAt:new Date()});
+  }
+
   /**
    * Get event by ID.
    */
