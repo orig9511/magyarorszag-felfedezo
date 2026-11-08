@@ -9,7 +9,7 @@ interface Identity { id:string;email:string;role:'admin'|'partner';status:string
 interface Organization {id:string;name:string;slug:string;businessType:Vertical;role:string;}
 interface Guide {id:string;slug:string;title:string;published:boolean;organization:string;}
 interface ModeratedGuide {id:string;slug:string;title:string;published:boolean;organization:string;businessType:string;poiCount:number;eventCount:number;}
-interface ReviewEvent {id:string;title:string;venue?:string;settlement:string;source:string;startTime:string;sourceUrl?:string;}
+interface ReviewEvent {id:string;title:string;venue?:string;settlement:string;source:string;startTime:string;sourceUrl?:string;hasLocation:boolean;}
 interface ReviewPoi {id:string;name:string;category:string;source:string;moderationStatus:'active'|'quarantined';attribution?:string;}
 interface Pending {id:string;email:string;name:string;businessType:Vertical;createdAt:string;}
 @Component({
@@ -61,9 +61,10 @@ interface Pending {id:string;email:string;name:string;businessType:Vertical;crea
      <h3>Események ellenőrzése</h3>
      <div class="item" *ngFor="let event of reviewEvents">
       <div><strong>{{event.title}}</strong><p>{{event.venue || event.settlement}} · {{event.startTime | date:'yyyy.MM.dd. HH:mm'}} · {{event.source}}</p>
+       <p *ngIf="!event.hasLocation">Hiányzó koordináták — publikálás előtt helyszín-ellenőrzés szükséges.</p>
        <a *ngIf="safeUrl(event.sourceUrl) as url" [href]="url" target="_blank" rel="noopener noreferrer">Eredeti adatforrás</a>
       </div>
-      <div class="actions"><button type="button" (click)="reviewEvent(event,true)">Jóváhagyás</button><button type="button" class="danger" (click)="reviewEvent(event,false)">Elutasítás</button></div>
+      <div class="actions"><button type="button" [disabled]="!event.hasLocation" (click)="reviewEvent(event,true)">Jóváhagyás</button><button type="button" class="danger" (click)="reviewEvent(event,false)">Elutasítás</button></div>
      </div>
      <div class="empty" *ngIf="!reviewEvents.length">Nincs felülvizsgálatra váró esemény.</div>
      <h3>Gyanús vagy karanténba helyezett helyszínek</h3>
