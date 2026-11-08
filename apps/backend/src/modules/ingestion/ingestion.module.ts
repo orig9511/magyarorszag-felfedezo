@@ -13,6 +13,7 @@ import { County } from "../county/county.entity";
 import { IngestionScheduler } from "./ingestion.scheduler";
 import { OSMAdapter } from "./adapters/osm.adapter";
 import { WikidataAdapter } from "./adapters/wikidata.adapter";
+import { FirecrawlTicketAdapter } from "./adapters/firecrawl-ticket.adapter";
 import { SettlementModule } from "../settlement/settlement.module";
 
 @Module({
@@ -29,6 +30,7 @@ import { SettlementModule } from "../settlement/settlement.module";
     IngestionScheduler,
     OSMAdapter,
     WikidataAdapter,
+    FirecrawlTicketAdapter,
   ],
   controllers: [IngestionController],
   exports: [IngestionService, DataRetentionService],
