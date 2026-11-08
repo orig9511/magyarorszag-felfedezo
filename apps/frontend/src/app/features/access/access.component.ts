@@ -92,7 +92,7 @@ export class AccessComponent implements OnInit {
  get subheading(){return {admin:'Partnerkérelmek és platformfelügyelet',hotel:'Vendégélmények és saját térképek egy helyen',restaurant:'Helyi jelenlét és éttermi információk',service:'Szolgáltatások és helyi ajánlatok kezelése'}[this.vertical];}
  get publishedCount(){return this.guides.filter(g=>g.published).length;}
  typeLabel(t:Vertical){return {hotel:'Szálláshely',restaurant:'Étterem',service:'Szolgáltató'}[t]||t;}
- ngOnInit(){this.route.paramMap.subscribe(params=>{const v=params.get('vertical');this.vertical=v==='admin'||v==='restaurant'||v==='service'?v:'hotel';this.identity=this.session.identity;this.error='';this.notice='';this.mode='login';});}
+ ngOnInit(){this.route.paramMap.subscribe(params=>{const v=params.get('vertical');this.vertical=v==='admin'||v==='restaurant'||v==='service'?v:'hotel';this.identity=this.session.identity;this.error='';this.notice='';this.mode='login';if(this.identity)this.refresh();});}
  async request(path:string,method='GET',body?:unknown):Promise<any>{
   return this.session.request('/api/access/'+path,method,body);
  }
@@ -117,8 +117,8 @@ export class AccessComponent implements OnInit {
    if(this.vertical==='admin'){this.pending=await this.request('admin/pending');return;}
    const [orgs,guides]=await Promise.all([this.request('organizations'),this.request('guides')]);
    this.organizations=(orgs as Organization[]).filter(o=>o.businessType===this.vertical);
-   const allowed=new Set(this.organizations.map(o=>o.name));
-   this.guides=(guides as Guide[]).filter(g=>allowed.has(g.organization));
+   const allowed=new Set(this.organizations.map(o=>o.id));
+   this.guides=(guides as (Guide & {organizationId:string})[]).filter(g=>allowed.has(g.organizationId));
   }catch(e){this.error=e instanceof Error?e.message:'Nem sikerült betölteni az adatokat.';}
  }
  async decide(id:string,approve:boolean){
