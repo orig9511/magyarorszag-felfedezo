@@ -8,6 +8,7 @@ import {
   Query,
   BadRequestException,
   UseGuards,
+  Header,
 } from "@nestjs/common";
 import { eventDateRange } from "./event-date-range";
 import { AdminTokenGuard } from '../auth/admin-token.guard';
@@ -23,6 +24,7 @@ export class EventController {
    * Get events within a viewport and optional filters.
    * GET /api/events/viewport?minLat=47.5&minLon=21.6&maxLat=47.55&maxLon=21.7&categories=concert,festival&days=7
    */
+  @Header("Cache-Control", "public, max-age=30, stale-while-revalidate=120")
   @Get("viewport")
   async getByViewport(@Query() query: GetEventsDto) {
     if (query.minLat >= query.maxLat || query.minLon >= query.maxLon) {
