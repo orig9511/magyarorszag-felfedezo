@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DataAdapter,RawEventData } from '../interfaces/data-adapter.interface';
-import { approvedTicketSource,TICKET_SOURCES } from '../ticket-source-registry';
+import { approvedTicketSource } from '../ticket-source-registry';
 import { extractTicketEvents } from '../ticket-jsonld';
 
 /**
@@ -45,7 +45,7 @@ export class FirecrawlTicketAdapter implements DataAdapter {
   if(!record.title||record.title.length<5)errors.push('invalid event title');
   if(!record.venue||!record.settlement)errors.push('venue and locality required');
   if(!(record.startTime instanceof Date)||!Number.isFinite(record.startTime.getTime()))errors.push('invalid date');
-  if(!record.sourceUrl||!record.licenceType){} // placeholder
+  if(!record.sourceUrl||!record.licenseType||!record.attribution)errors.push('source licence and attribution required');
   return {valid:errors.length===0,errors};
  }
 }
