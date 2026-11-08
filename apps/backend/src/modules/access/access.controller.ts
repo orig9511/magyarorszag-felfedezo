@@ -1,11 +1,12 @@
 import { Body, Controller, Get, Post, Param, Req, UseGuards, ForbiddenException, Headers } from "@nestjs/common";
 import { AccessGuard, AuthenticatedRequest } from "./access.guard";
 import { AccessService } from "./access.service";
+import { AccessThrottleGuard } from "./access-throttle.guard";
 @Controller("api/access")
 export class AccessController {
  constructor(private readonly access:AccessService) {}
- @Post("register") register(@Body() body:unknown) {return this.access.register(body);}
- @Post("login") login(@Body() body:unknown) {return this.access.login(body);}
+ @Post("register") @UseGuards(AccessThrottleGuard) register(@Body() body:unknown) {return this.access.register(body);}
+ @Post("login") @UseGuards(AccessThrottleGuard) login(@Body() body:unknown) {return this.access.login(body);}
  @Post("logout") @UseGuards(AccessGuard)
  logout(@Headers("authorization") header:string) {return this.access.logout(header.slice(7));}
  @Get("me") @UseGuards(AccessGuard)

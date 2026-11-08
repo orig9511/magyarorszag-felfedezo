@@ -7,6 +7,7 @@ type Vertical = 'hotel' | 'restaurant' | 'service';
 interface Identity { id:string;email:string;role:'admin'|'partner';status:string; }
 interface Organization {id:string;name:string;slug:string;businessType:Vertical;role:string;}
 interface Guide {id:string;slug:string;title:string;published:boolean;organization:string;}
+interface ModeratedGuide {id:string;slug:string;title:string;published:boolean;organization:string;businessType:string;poiCount:number;eventCount:number;}
 interface Pending {id:string;email:string;name:string;businessType:Vertical;createdAt:string;}
 @Component({
  selector:'app-access',standalone:true,imports:[CommonModule,FormsModule,RouterLink],
@@ -44,6 +45,15 @@ interface Pending {id:string;email:string;name:string;businessType:Vertical;crea
      <div class="section-head"><h2>Jóváhagyásra váró partnerek</h2><button class="ghost" (click)="refresh()">Frissítés</button></div>
      <div class="empty" *ngIf="!pending.length">Nincs függőben lévő regisztráció.</div>
      <div class="item" *ngFor="let p of pending"><div><strong>{{p.name || p.email}}</strong><p>{{p.email}} · {{typeLabel(p.businessType)}}</p></div><div class="actions"><button (click)="decide(p.id,true)">Jóváhagyás</button><button class="danger" (click)="decide(p.id,false)">Elutasítás</button></div></div>
+     <div class="section-head"><h2>Vendégtérképek moderálása</h2><span class="muted">Csak ellenőrzött tartalmat publikálj</span></div>
+     <div class="item" *ngFor="let guide of moderatedGuides">
+      <div><strong>{{guide.title}}</strong><p>{{guide.organization}} · {{guide.slug}} · {{guide.poiCount}} helyszín · {{guide.eventCount}} esemény</p></div>
+      <div class="actions"><span class="pill">{{guide.published?'Publikált':'Piszkozat'}}</span>
+       <button *ngIf="!guide.published" (click)="publishGuide(guide,true)">Publikálás</button>
+       <button *ngIf="guide.published" class="danger" (click)="publishGuide(guide,false)">Visszavonás</button>
+      </div>
+     </div>
+     <div class="empty" *ngIf="!moderatedGuides.length">Még nincs vendégtérkép.</div>
     </ng-container>
     <ng-container *ngIf="vertical!=='admin'">
      <div class="stats"><article><span>Szervezetek</span><strong>{{organizations.length}}</strong></article><article><span>Vendégtérképek</span><strong>{{guides.length}}</strong></article><article><span>Publikált</span><strong>{{publishedCount}}</strong></article></div>
@@ -83,7 +93,7 @@ interface Pending {id:string;email:string;name:string;businessType:Vertical;crea
 })
 export class AccessComponent implements OnInit {
  vertical:'admin'|Vertical='hotel';mode:'login'|'register'='login';
- identity?:Identity;organizations:Organization[]=[];guides:Guide[]=[];pending:Pending[]=[];
+ identity?:Identity;organizations:Organization[]=[];guides:Guide[]=[];pending:Pending[]=[];moderatedGuides:ModeratedGuide[]=[];
  error='';notice='';busy=false;
  get token(){return this.session.token;}
  form={email:'',password:'',name:'',slug:''};
@@ -114,7 +124,7 @@ export class AccessComponent implements OnInit {
  async refresh(){
   if(!this.identity)return;
   try{
-   if(this.vertical==='admin'){this.pending=await this.request('admin/pending');return;}
+   if(this.vertical==='admin'){const [pending,guides]=await Promise.all([this.request('admin/pending'),this.request('admin/guides')]);this.pending=pending;this.moderatedGuides=guides;return;}
    const [orgs,guides]=await Promise.all([this.request('organizations'),this.request('guides')]);
    this.organizations=(orgs as Organization[]).filter(o=>o.businessType===this.vertical);
    const allowed=new Set(this.organizations.map(o=>o.id));
@@ -124,6 +134,15 @@ export class AccessComponent implements OnInit {
  async decide(id:string,approve:boolean){
   try{await this.request('admin/'+id+'/'+(approve?'approve':'reject'),'POST');this.notice=approve?'Partner jóváhagyva.':'Kérelem elutasítva.';await this.refresh();}
   catch(e){this.error=e instanceof Error?e.message:'Hiba történt.';}
+ }
+ async publishGuide(guide:ModeratedGuide,publish:boolean){
+  if(!confirm(publish?'Ellenőrizted a helyszínek forrását és a felhasználási jogokat? Publikálod a térképet?':'Visszavonod a nyilvános térképet?'))return;
+  this.error='';this.notice='';
+  try{
+   await this.request('admin/guides/'+guide.id+'/'+(publish?'publish':'unpublish'),'POST');
+   this.notice=publish?'A térkép publikálva.':'A térkép visszavonva.';
+   await this.refresh();
+  }catch(e){this.error=e instanceof Error?e.message:'Sikertelen művelet.';}
  }
  async logout(){
   try{if(this.token)await this.request('logout','POST');}catch{}
