@@ -1,4 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
+import { assertSourceApproved } from "./source-policy";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, In } from "typeorm";
 import {
@@ -36,6 +37,7 @@ export class IngestionService {
     if (process.env.MOMAP_INGESTION_ENABLED !== 'true') {
       throw new Error('Ingestion disabled until compliance and staging review');
     }
+    assertSourceApproved(adapter.name);
     const jobRecord = await this.createJobRecord(adapter.name);
     const startedAt = new Date();
 
