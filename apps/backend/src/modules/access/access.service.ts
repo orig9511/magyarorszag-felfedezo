@@ -84,7 +84,7 @@ export class AccessService {
  }
  async myGuides(identity:AccessIdentity) {
   return this.db.query(
-   `SELECT g.id,g.slug,g.title,g.published,o.name AS organization
+   `SELECT g.id,g.slug,g.title,g.published,o.name AS organization,g.organization_id AS "organizationId"
       FROM momap_guides g JOIN momap_organization_memberships m ON m.organization_id=g.organization_id
       JOIN momap_organizations o ON o.id=g.organization_id
       WHERE m.auth_subject=$1 ORDER BY g.created_at DESC LIMIT 100`,[identity.id]);
