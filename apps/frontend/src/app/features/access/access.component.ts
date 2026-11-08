@@ -60,7 +60,7 @@ interface Pending {id:string;email:string;name:string;businessType:Vertical;crea
      <div class="section-head"><h2>Adatminőségi moderáció</h2><span class="muted">Karantén, ellenőrzés és jóváhagyás</span></div>
      <h3>Események ellenőrzése</h3>
      <div class="item" *ngFor="let event of reviewEvents">
-      <div><strong>{{event.title}}</strong><p>{{event.venue || event.settlement}} · {{event.startTime | date:'yyyy.MM.dd. HH:mm':'':'hu'}} · {{event.source}}</p>
+      <div><strong>{{event.title}}</strong><p>{{event.venue || event.settlement}} · {{event.startTime | date:'yyyy.MM.dd. HH:mm'}} · {{event.source}}</p>
        <a *ngIf="safeUrl(event.sourceUrl) as url" [href]="url" target="_blank" rel="noopener noreferrer">Eredeti adatforrás</a>
       </div>
       <div class="actions"><button type="button" (click)="reviewEvent(event,true)">Jóváhagyás</button><button type="button" class="danger" (click)="reviewEvent(event,false)">Elutasítás</button></div>
@@ -180,7 +180,7 @@ export class AccessComponent implements OnInit {
    await this.refresh();
   }catch(e){this.error=e instanceof Error?e.message:'Sikertelen művelet.';}
  }
- safeUrl(value?:string){return value && /^https?:\\/\\//i.test(value)?value:null;}
+ safeUrl(value?:string){return value && /^https?:\/\//i.test(value)?value:null;}
  async reviewEvent(event:ReviewEvent,approve:boolean){
   if(!confirm(approve?'Ellenőrizted az eseményt és az adatközlési engedélyt? Publikálod?':'Elutasítod ezt az eseményt?'))return;
   try{await this.request('admin/events/'+event.id+'/'+(approve?'approve':'reject'),'POST');this.notice=approve?'Az esemény jóváhagyva.':'Az esemény elutasítva.';await this.refresh();}
